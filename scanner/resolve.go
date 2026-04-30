@@ -46,6 +46,9 @@ var SkipDirs = map[string]bool{
 	".idea":       true,
 	"DerivedData": true,
 	".build":      true,
+	// Demo / Internal
+	"examples": true,
+	"landing":  true,
 }
 
 // importRe matches ES module static imports and re-exports.

@@ -1,12 +1,18 @@
 {
-  "exitOnWarning": false,
-  "format": "sarif",
+  "version": "1.0",
   "paths": [
     "src",
     "app",
     "pages",
     "components"
   ],
-  "platform": "",
-  "version": "1.0"
+  "exclude": [
+    "node_modules",
+    ".git",
+    "examples",
+    "landing"
+  ],
+  "format": "sarif",
+  "exitOnWarning": false,
+  "platform": ""
 }
