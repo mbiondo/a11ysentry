@@ -23,7 +23,7 @@ jobs:
           curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
 
       - name: Run Accessibility Audit (SARIF)
-        run: a11ysentry --format sarif --dir . > results.sarif
+        run: a11ysentry --format sarif --dir . --exclude examples,landing > results.sarif
         continue-on-error: true
 
       - name: Upload SARIF to GitHub Code Scanning
@@ -33,5 +33,5 @@ jobs:
           category: a11ysentry
 
       - name: Run Accessibility Audit (Text / Exit Codes)
-        run: a11ysentry --dir .
+        run: a11ysentry --dir . --exclude examples,landing
         continue-on-error: true

@@ -24,7 +24,7 @@ jobs:
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: --timeout=5m
+          args: --timeout=5m --skip-dirs=examples,landing
 
   test:
     name: Test & Build Verification
@@ -46,7 +46,7 @@ jobs:
         run: go test -v ./adapters/...
         
       - name: Verify CLI Build
-        run: go build -v -o a11ysentry ./cli
+        run: go build -v -o a11ysentry ./cmd/a11ysentry
 
   release:
     name: Release

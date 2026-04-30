@@ -55,20 +55,27 @@ func isProjectRoot(dir string) bool {
 //
 // If dir itself is a project root it is returned immediately without further
 // traversal (single-project fast path).
-func FindProjectRoots(dir string) []string {
+func FindProjectRoots(dir string, excludes ...string) []string {
 	abs, err := filepath.Abs(dir)
 	if err != nil {
 		abs = dir
 	}
+
+	// Prepare excludes map
+	excludeMap := make(map[string]bool)
+	for _, e := range excludes {
+		excludeMap[e] = true
+	}
+
 	// Fast path: the given dir is itself a project root.
 	if isProjectRoot(abs) {
 		return []string{abs}
 	}
-	return collectRoots(abs)
+	return collectRoots(abs, excludeMap)
 }
 
 // collectRoots is the recursive implementation of FindProjectRoots.
-func collectRoots(dir string) []string {
+func collectRoots(dir string, excludeMap map[string]bool) []string {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return nil
@@ -79,7 +86,7 @@ func collectRoots(dir string) []string {
 		if !entry.IsDir() {
 			continue
 		}
-		if SkipDirs[entry.Name()] {
+		if SkipDirs[entry.Name()] || excludeMap[entry.Name()] {
 			continue
 		}
 		sub := filepath.Join(dir, entry.Name())
@@ -87,11 +94,12 @@ func collectRoots(dir string) []string {
 			roots = append(roots, sub)
 			// Don't descend — projects don't nest.
 		} else {
-			roots = append(roots, collectRoots(sub)...)
+			roots = append(roots, collectRoots(sub, excludeMap)...)
 		}
 	}
 	return roots
 }
+
 
 // PageTree is a single analysis unit: an ordered set of files that form a
 // complete rendering context for one route or view.
