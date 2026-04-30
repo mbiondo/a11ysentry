@@ -1,0 +1,18 @@
+---
+title: Accessibility Test
+description: Intentional accessibility violations for testing analyzer
+---
+<section lang="es" aria-label="Prueba de accesibilidad">
+  <h1>Prueba de accesibilidad</h1>
+  <h2>Subtitulo con jerarquia incorrecta</h2>
+</section>
+<img src="/hero.png" alt="Hero image">
+<a href="#" aria-label="Enlace de prueba">Enlace de prueba</a>
+<button class="icon-btn" aria-label="Icon button">Icon Button</button>
+<div>
+  <label for="test-email">Email</label>
+  <input id="test-email" type="email" placeholder="Email" />
+</div>
+<div style="background:#f7f7f7; color:#777; padding:8px;">
+  Este texto tiene bajo contraste
+</div>

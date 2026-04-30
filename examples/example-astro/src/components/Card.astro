@@ -1,0 +1,11 @@
+---
+const { title } = Astro.props;
+---
+<article class="card">
+  <!-- A11Y ISSUE: low contrast ratio blue-500 on white bg -->
+  <h2 class="text-blue-500" style="background-color: #ffffff;">{title}</h2>
+  <p>Learn more about this topic in our documentation.</p>
+  <!-- A11Y ISSUE: input missing label (WCAG_3_3_2) -->
+  <input type="email" placeholder="Subscribe to updates..." />
+  <button>Subscribe</button>
+</article>

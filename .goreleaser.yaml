@@ -1,0 +1,61 @@
+# .goreleaser.yaml
+# Configuration for A11ySentry Multi-platform Builds
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: a11ysentry
+    main: ./cmd/a11ysentry/main.go
+    binary: a11ysentry
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - format: tar.gz
+    # use zip for windows archives
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - CONTRIBUTING.md
+      - install.sh
+      - install.ps1
+
+checksum:
+  name_template: 'checksums.txt'
+
+snapshot:
+  name_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+
+# Optional: Brew formula for macOS users
+brews:
+  - name: a11ysentry
+    repository:
+      owner: mbiondo
+      name: homebrew-tap
+    directory: Formula
+    homepage: "https://github.com/mbiondo/a11ysentry"
+    description: "Universal multi-platform accessibility engine with TUI and MCP support."
+    install: |
+      bin.install "a11ysentry"

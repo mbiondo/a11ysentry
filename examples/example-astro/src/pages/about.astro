@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+<Layout title="About">
+  <h1>About Us</h1>
+  <p>We build fast, accessible websites with Astro.</p>
+
+  <!-- A11Y ISSUE: button missing accessible name (WCAG_4_1_2) -->
+  <button class="icon-btn">
+    <svg viewBox="0 0 24 24" width="24" height="24">
+      <path d="M12 4l8 16H4z"/>
+    </svg>
+  </button>
+
+  <!-- A11Y ISSUE: heading jump h1 -> h3 (WCAG_1_3_1) -->
+  <h3>Our Team</h3>
+  <p>A passionate group of developers.</p>
+</Layout>

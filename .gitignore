@@ -1,0 +1,53 @@
+# Binaries and build artifacts
+*.exe
+a11ysentry
+a11ysentry.exe
+cli/a11ysentry
+cli/a11ysentry.exe
+cli/cli.exe
+cli.exe
+/bin/
+/build/
+/dist/
+
+# Go workspace files (local to each developer)
+go.work
+go.work.sum
+
+# Go modules (each sub-module has its own go.mod/go.sum)
+# These are managed independently per module — uncomment if you want to ignore them:
+# **/go.sum
+
+# A11ySentry database
+.a11ysentry/
+history.db
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Node.js / frontend (landing/)
+**/node_modules/
+**/.next/
+**/.astro/
+**/dist/
+**/.turbo/
+
+# Logs
+*.log
+logs/
+
+# Test outputs
+*.sarif
+*.out
+*.test
+
+# Temporary files
+*.tmp
+*.cache
+.cache/

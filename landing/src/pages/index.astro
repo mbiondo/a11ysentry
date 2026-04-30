@@ -1,0 +1,31 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Hero from '../components/Hero.astro';
+import Features from '../components/Features.astro';
+import Comparison from '../components/Comparison.astro';
+import '../styles/global.css';
+---
+
+<Layout title="a11ysentry | Local & Deterministic Accessibility Engine">
+	<main>
+        <h1 class="sr-only">a11ysentry: Local and Deterministic Accessibility Engineering</h1>
+		<Hero />
+		<Features />
+        <Comparison />
+        
+        <section class="py-24 text-center px-6">
+            <div class="bg-gradient-to-br from-blue-700 to-emerald-700 p-12 rounded-3xl max-w-4xl mx-auto shadow-2xl">
+                <h2 class="text-4xl font-extrabold mb-6">Stop guessing. Start ensuring.</h2>
+                <p class="text-xl mb-10 text-blue-50 text-white opacity-90">Secure your UI with real engineering today.</p>
+                <div class="flex justify-center gap-4">
+                    <button class="bg-white text-blue-700 px-6 h-10 rounded-lg font-bold text-xs uppercase">Quick Fix</button>
+                    <button role="switch" aria-pressed="false" class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-black transition-all">Enable A11y</button>
+                </div>
+            </div>
+        </section>
+	</main>
+    <footer class="py-10 border-t border-slate-800 text-center text-slate-400">
+        <p>&copy; 2026 a11ysentry. Build with ❤️ for everyone.</p>
+        <img src="/logo-gray.png" alt="a11ysentry secondary logo" class="mx-auto mt-4 opacity-50" />
+    </footer>
+</Layout>

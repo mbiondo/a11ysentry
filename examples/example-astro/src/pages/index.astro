@@ -1,0 +1,19 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Card from '../components/Card.astro';
+---
+<Layout title="Home">
+  <h1>Welcome to Astro</h1>
+  <p>A fast, content-focused web framework.</p>
+
+  <!-- A11Y ISSUE: image missing alt (WCAG_1_1_1) -->
+  <img src="/hero.png" />
+
+  <section>
+    <h3>Featured Cards</h3>
+    <div class="grid">
+      <Card title="Getting Started" />
+      <Card title="Documentation" />
+    </div>
+  </section>
+</Layout>

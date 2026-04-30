@@ -1,0 +1,41 @@
+# Git attributes for consistent line endings and diff behavior
+
+# Auto-detect text files and ensure LF line endings in the repo
+* text=auto eol=lf
+
+# Go files: LF, diff as go
+*.go text eol=lf diff=go
+
+# Shell scripts: LF, executable
+*.sh text eol=lf diff=sh
+*.ps1 text eol=crlf diff=powershell
+
+# Markdown: LF
+*.md text eol=lf diff=markdown
+
+# JSON/YAML: LF
+*.json text eol=lf diff=json
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# HTML/CSS/JS: LF
+*.html text eol=lf diff=html
+*.css text eol=lf diff=css
+*.js text eol=lf diff=javascript
+*.ts text eol=lf diff=typescript
+*.tsx text eol=lf diff=typescript
+*.jsx text eol=lf diff=javascript
+
+# Images and binaries: mark as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.exe binary
+*.dll binary
+
+# SQLite databases: binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary

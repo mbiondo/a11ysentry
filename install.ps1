@@ -1,0 +1,59 @@
+# A11ySentry Windows Smart Installer
+# Detects Architecture, downloads the latest binary, 
+# and registers MCP in Claude, Cursor, etc.
+
+$Owner = "mbiondo"
+$Repo = "a11ysentry"
+$BinaryName = "a11ysentry.exe"
+
+Write-Host "🛡️  A11ySentry: Starting smart installation for Windows..." -ForegroundColor Cyan
+
+# 1. Detect Arch
+$Arch = "amd64"
+if ([IntPtr]::Size -eq 4) { $Arch = "386" }
+
+# 2. Setup Directories
+$InstallDir = Join-Path $env:USERPROFILE ".a11ysentry\bin"
+if (!(Test-Path $InstallDir)) { 
+    New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
+}
+
+# 3. DEV MODE: Copy if exists locally
+$WorkspaceBinary = Join-Path $PSScriptRoot "cmd\a11ysentry\a11ysentry.exe"
+if (Test-Path $WorkspaceBinary) {
+    Copy-Item $WorkspaceBinary -Destination (Join-Path $InstallDir $BinaryName) -Force
+    Write-Host "🚧 DEV MODE: Copied binary from cmd\a11ysentry\." -ForegroundColor Yellow
+}
+
+# 4. Add to PATH
+$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($UserPath -notlike "*$InstallDir*") {
+    $NewPath = "$UserPath;$InstallDir"
+    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
+    $env:Path += ";$InstallDir"
+    Write-Host "Added to User PATH." -ForegroundColor Green
+}
+
+# 5. MCP Registration & Skill Setup
+Write-Host "Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
+$BinaryFull = Join-Path $InstallDir $BinaryName
+if (Test-Path $BinaryFull) {
+    # Call the binary with the mcp subcommand
+    & $BinaryFull mcp --register
+    
+    # 6. Skill Registration
+    $SkillSource = Join-Path $PSScriptRoot "skills\a11ysentry-mcp"
+    $AgentSkillsDir = Join-Path $env:USERPROFILE ".gemini\skills\a11ysentry-mcp"
+    if (Test-Path $SkillSource) {
+        if (!(Test-Path $AgentSkillsDir)) {
+            New-Item -ItemType Directory -Path $AgentSkillsDir -Force | Out-Null
+        }
+        Copy-Item -Path "$SkillSource\*" -Destination $AgentSkillsDir -Recurse -Force
+        Write-Host "Registered a11ysentry-mcp skill in Agent Teams." -ForegroundColor Green
+    }
+} else {
+    Write-Warning "Automatic MCP registration skipped (binary not found at $BinaryFull)."
+}
+
+Write-Host "A11ySentry installed successfully!" -ForegroundColor Green
+Write-Host "Restart your terminal and try running 'a11ysentry --tui'."

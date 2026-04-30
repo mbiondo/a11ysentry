@@ -1,0 +1,31 @@
+# Define code owners for the repository
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Global owners (default for all files)
+*       @mbiondo
+
+# Core engine
+/engine/        @mbiondo
+
+# CLI, TUI, and MCP
+/cli/           @mbiondo
+/mcp/           @mbiondo
+
+# Adapters
+/adapters/      @mbiondo
+
+# Documentation
+/docs/          @mbiondo
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+
+# CI/CD and project config
+.github/        @mbiondo
+.go.work
+.goreleaser.yaml
+.gitignore
+.gitattributes
+.editorconfig
+a11ysentry.json

@@ -1,0 +1,12 @@
+{
+  "exitOnWarning": false,
+  "format": "sarif",
+  "paths": [
+    "src",
+    "app",
+    "pages",
+    "components"
+  ],
+  "platform": "",
+  "version": "1.0"
+}

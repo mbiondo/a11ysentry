@@ -1,0 +1,32 @@
+---
+const { title, lang = 'en' } = Astro.props;
+---
+<html lang={lang}>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width" />
+		<title>{title}</title>
+	</head>
+	<body class="bg-slate-900 text-white font-sans selection:bg-blue-500 selection:text-white">
+        <nav class="py-6 px-6 flex justify-between items-center max-w-6xl mx-auto">
+            <div class="text-2xl font-bold tracking-tighter flex items-center gap-2">
+                <span class="text-blue-500 text-3xl">🛡️</span> a11ysentry
+            </div>
+            <div class="flex gap-4 items-center">
+                <a href="/" class="text-sm font-medium hover:text-blue-400 transition-colors">EN</a>
+                <span class="text-slate-700">|</span>
+                <a href="/es" class="text-sm font-medium hover:text-blue-400 transition-colors">ES</a>
+                <a href="https://github.com/mbiondo/a11ysentry" class="ml-4 bg-slate-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-all border border-slate-700">GitHub</a>
+            </div>
+        </nav>
+		<slot />
+        <footer class="py-20 border-t border-slate-800 text-center text-slate-500">
+            <p>&copy; 2026 a11ysentry. Built with ❤️ for everyone.</p>
+            <div class="mt-4 flex justify-center gap-6 text-sm">
+                <a href="#" class="hover:text-white transition-colors">Documentation</a>
+                <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="#" class="hover:text-white transition-colors">Enterprise</a>
+            </div>
+        </footer>
+	</body>
+</html>

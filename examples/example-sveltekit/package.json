@@ -1,0 +1,11 @@
+{
+  "name": "example-sveltekit",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@sveltejs/kit": "^2.0.0",
+    "svelte": "^4.0.0"
+  }
+}
