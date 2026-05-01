@@ -1,0 +1,47 @@
+---
+// KeyboardNavDemo.astro
+// Este componente sirve para probar la nueva regla WCAG 2.1.1 de navegación por teclado.
+---
+<section>
+  <h2>Prueba de Navegación por Teclado</h2>
+  
+  <p>Los siguientes elementos simulan diferentes casos interactivos:</p>
+  
+  <!-- CASO 1: FALLA (Infracción WCAG_2_1_1)
+       Elemento genérico (div) con handler de ratón (onclick) pero sin teclado ni tabindex. -->
+  <div onclick="alert('click')" class="btn-simulado">
+    Hacé click acá (Falla A11y)
+  </div>
+
+  <!-- CASO 2: FALLA (Infracción WCAG_2_1_1)
+       Elemento genérico (span) usando sintaxis de Vue/Alpine (@click) sin teclado ni tabindex. -->
+  <span @click="open = true" class="badge-interactivo">
+    Abrir Modal (Falla A11y)
+  </span>
+
+  <!-- CASO 3: PASA
+       Elemento genérico (div) con handlers de ratón, teclado y tabindex. -->
+  <div onclick="alert('click')" onkeydown="if(event.key==='Enter') alert('click')" tabindex="0" class="btn-accesible">
+    Botón Accesible
+  </div>
+
+  <!-- CASO 4: PASA
+       Elemento nativo interactivo (button) con onclick (no necesita onkeydown ni tabindex explícitos). -->
+  <button onclick="alert('click')">
+    Botón Nativo
+  </button>
+</section>
+
+<style>
+  .btn-simulado, .badge-interactivo, .btn-accesible {
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    background-color: #e2e8f0;
+    margin: 0.5rem;
+    cursor: pointer;
+  }
+  .btn-accesible:focus {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+  }
+</style>

@@ -299,6 +299,29 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 			}
 		}
 
+		// Rule 16: Keyboard Navigation for clickable elements (WCAG 2.1.1)
+		// Elements with click handlers must have keyboard handlers and be focusable.
+		hasMouseClick := node.Traits["onclick"] != nil || node.Traits["@click"] != nil || node.Traits["v-on:click"] != nil || node.Traits["(click)"] != nil || node.Traits["on:click"] != nil
+		hasKeyboard := node.Traits["onkeydown"] != nil || node.Traits["@keydown"] != nil || node.Traits["v-on:keydown"] != nil || node.Traits["(keydown)"] != nil || node.Traits["on:keydown"] != nil ||
+			node.Traits["onkeyup"] != nil || node.Traits["@keyup"] != nil || node.Traits["v-on:keyup"] != nil || node.Traits["(keyup)"] != nil || node.Traits["on:keyup"] != nil ||
+			node.Traits["onkeypress"] != nil || node.Traits["@keypress"] != nil || node.Traits["v-on:keypress"] != nil || node.Traits["(keypress)"] != nil || node.Traits["on:keypress"] != nil
+		hasTabIndex := node.Traits["tabindex"] != nil
+
+		isNativeInteractive := node.Role == RoleButton || node.Role == RoleLink || node.Role == RoleInput
+
+		if hasMouseClick && !isNativeInteractive {
+			if !hasKeyboard || !hasTabIndex {
+				violations = append(violations, Violation{
+					ErrorCode:        "WCAG_2_1_1",
+					Severity:         SeverityError,
+					Message:          "Non-interactive element with a click handler is missing keyboard support (keydown/keyup) or is not focusable (tabindex).",
+					SourceRef:        node.Source,
+					FixSnippet:       "Add a keydown handler and tabindex=\"0\", or change the element to a native <button>.",
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/general/G90",
+				})
+			}
+		}
+
 		// Rule 6: Color Contrast (WCAG 1.4.3)
 		if node.Role == RoleHeading || node.Role == RoleButton || node.Role == "generic" {
 			fg, hasFg := node.Traits["color"].(string)

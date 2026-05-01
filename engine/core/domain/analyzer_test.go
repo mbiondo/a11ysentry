@@ -99,6 +99,28 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 			wantCodes: []string{"WCAG_3_1_1", "G141"},
 		},
 		{
+			name: "Generic Element with Click but no Keyboard/Focus",
+			nodes: []USN{
+				{
+					Role:   "generic",
+					Traits: map[string]any{"onclick": "handleClick"},
+					Source: Source{Platform: PlatformWebReact},
+				},
+			},
+			wantCodes: []string{"WCAG_2_1_1", "WCAG_3_1_1", "G141"},
+		},
+		{
+			name: "Generic Element with Click and Keyboard/Focus",
+			nodes: []USN{
+				{
+					Role:   "generic",
+					Traits: map[string]any{"onclick": "handleClick", "onkeydown": "handleKey", "tabindex": "0"},
+					Source: Source{Platform: PlatformWebReact},
+				},
+			},
+			wantCodes: []string{"WCAG_3_1_1", "G141"},
+		},
+		{
 			name: "Mobile - No H1/Lang required",
 			nodes: []USN{
 				{Role: RoleButton, Label: "Save", Source: Source{Platform: PlatformAndroidCompose}},

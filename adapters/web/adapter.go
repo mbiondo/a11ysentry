@@ -182,7 +182,12 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		for _, attr := range n.Attr {
 			if attr.Key == "id" || attr.Key == "lang" || attr.Key == "type" || attr.Key == "class" || attr.Key == "className" || attr.Key == "for" ||
 				attr.Key == "aria-pressed" || attr.Key == "aria-expanded" || attr.Key == "aria-checked" || attr.Key == "role" ||
-				attr.Key == "tabindex" || attr.Key == "aria-live" {
+				attr.Key == "tabindex" || attr.Key == "aria-live" ||
+				attr.Key == "onclick" || attr.Key == "onkeydown" || attr.Key == "onkeyup" || attr.Key == "onkeypress" ||
+				attr.Key == "@click" || attr.Key == "v-on:click" || attr.Key == "(click)" || attr.Key == "on:click" ||
+				attr.Key == "@keydown" || attr.Key == "v-on:keydown" || attr.Key == "(keydown)" || attr.Key == "on:keydown" ||
+				attr.Key == "@keyup" || attr.Key == "v-on:keyup" || attr.Key == "(keyup)" || attr.Key == "on:keyup" ||
+				attr.Key == "@keypress" || attr.Key == "v-on:keypress" || attr.Key == "(keypress)" || attr.Key == "on:keypress" {
 				usn.Traits[attr.Key] = attr.Val
 			}
 
