@@ -22,13 +22,16 @@ jobs:
           cache: true
       - name: Create Go Workspace
         run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/blazor ./adapters/dotnet ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/reactnative ./adapters/unity ./adapters/web
+      - name: Install golangci-lint
+        run: curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.64.8
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --timeout=5m --exclude-dirs=examples,landing
         env:
           GOWORK: ${{ github.workspace }}/go.work
+        run: |
+          for mod in engine scanner mcp cmd/a11ysentry adapters/android adapters/blazor adapters/dotnet adapters/flutter adapters/godot adapters/ios adapters/javadesktop adapters/reactnative adapters/unity adapters/web; do
+            echo "==> Linting $mod"
+            (cd "$mod" && golangci-lint run --timeout=5m ./...)
+          done
 
   test:
     name: Test & Build Verification
