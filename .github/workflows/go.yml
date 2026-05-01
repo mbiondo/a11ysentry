@@ -20,11 +20,13 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
+      - name: Create Go Workspace
+        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/blazor ./adapters/dotnet ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/reactnative ./adapters/unity ./adapters/web
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v6
         with:
           version: latest
-          args: --timeout=5m --skip-dirs=examples,landing
+          args: --timeout=5m --exclude-dirs=examples,landing
 
   test:
     name: Test & Build Verification
@@ -35,16 +37,15 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
-      
-      - name: Sync Workspace
-        run: go work sync
-        
+      - name: Create Go Workspace
+        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/blazor ./adapters/dotnet ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/reactnative ./adapters/unity ./adapters/web
+
       - name: Run Engine Tests
         run: go test -v ./engine/...
-        
+
       - name: Run Adapters Tests
         run: go test -v ./adapters/...
-        
+
       - name: Verify CLI Build
         run: go build -v -o a11ysentry ./cmd/a11ysentry
 
@@ -61,6 +62,8 @@ jobs:
         with:
           go-version: '1.24'
           cache: true
+      - name: Create Go Workspace
+        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/blazor ./adapters/dotnet ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/reactnative ./adapters/unity ./adapters/web
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
