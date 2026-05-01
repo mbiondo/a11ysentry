@@ -10,8 +10,8 @@ import (
 func TestSQLiteRepository(t *testing.T) {
 	dbPath := "test_history.db"
 	// Always clean up before and after to ensure isolation.
-	os.Remove(dbPath)
-	t.Cleanup(func() { os.Remove(dbPath) })
+	_ = os.Remove(dbPath)
+	t.Cleanup(func() { _ = os.Remove(dbPath) })
 
 	repo, err := NewSQLiteRepository(dbPath)
 	if err != nil {

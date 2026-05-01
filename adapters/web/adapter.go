@@ -394,7 +394,7 @@ func (a *htmlAdapter) renderNode(n *html.Node) string {
 	// We only want the start tag for better UX in reports
 	buf.WriteString("<" + n.Data)
 	for _, attr := range n.Attr {
-		buf.WriteString(fmt.Sprintf(" %s=\"%s\"", attr.Key, attr.Val))
+		fmt.Fprintf(&buf, " %s=\"%s\"", attr.Key, attr.Val)
 	}
 	buf.WriteString(">")
 	return buf.String()

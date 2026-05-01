@@ -58,9 +58,15 @@ func TestFindProjectRootsMobile(t *testing.T) {
 
 func TestAndroidScanner(t *testing.T) {
 	tmp := t.TempDir()
-	os.WriteFile(filepath.Join(tmp, "build.gradle"), []byte(""), 0644)
-	os.WriteFile(filepath.Join(tmp, "MainActivity.kt"), []byte("import android.os.Bundle"), 0644)
-	os.WriteFile(filepath.Join(tmp, "activity_main.xml"), []byte("<Layout></Layout>"), 0644)
+	if err := os.WriteFile(filepath.Join(tmp, "build.gradle"), []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "MainActivity.kt"), []byte("import android.os.Bundle"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "activity_main.xml"), []byte("<Layout></Layout>"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	fw := android.New()
 	if !fw.Probe(tmp) {
@@ -79,8 +85,12 @@ func TestAndroidScanner(t *testing.T) {
 
 func TestIOSScanner(t *testing.T) {
 	tmp := t.TempDir()
-	os.MkdirAll(filepath.Join(tmp, "MyApp.xcodeproj"), 0755)
-	os.WriteFile(filepath.Join(tmp, "ContentView.swift"), []byte("import SwiftUI"), 0644)
+	if err := os.MkdirAll(filepath.Join(tmp, "MyApp.xcodeproj"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmp, "ContentView.swift"), []byte("import SwiftUI"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	fw := ios.New()
 	if !fw.Probe(tmp) {
