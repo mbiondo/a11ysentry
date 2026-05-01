@@ -27,8 +27,6 @@ jobs:
         with:
           version: latest
           args: --timeout=5m --exclude-dirs=examples,landing
-        env:
-          GOWORK: ${{ github.workspace }}/go.work
 
   test:
     name: Test & Build Verification
@@ -45,11 +43,11 @@ jobs:
       - name: Run Engine Tests
         run: go test -v ./engine/...
 
-      - name: Run Scanner Tests
-        run: go test -v ./scanner/...
+      - name: Run Adapters Tests
+        run: go test -v ./adapters/...
 
       - name: Verify CLI Build
-        run: go build -v -o /tmp/a11ysentry ./cmd/a11ysentry
+        run: go build -v -o a11ysentry ./cmd/a11ysentry
 
   release:
     name: Release
