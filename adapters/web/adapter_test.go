@@ -24,9 +24,13 @@ func TestHTMLAdapter_CSSAnalysis(t *testing.T) {
 		</html>
 	`
 	tmpFile, _ := os.CreateTemp("", "test_css_*.html")
-	defer os.Remove(tmpFile.Name())
-	tmpFile.WriteString(htmlContent)
-	tmpFile.Close()
+	defer os.Remove(tmpFile.Name()) //nolint:errcheck
+	if _, err := tmpFile.WriteString(htmlContent); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	adapter := NewHTMLAdapter()
 	nodes, err := adapter.Ingest(context.Background(), []string{tmpFile.Name()})

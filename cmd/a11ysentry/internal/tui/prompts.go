@@ -80,7 +80,7 @@ func (m MultiSelectModel) View() string {
 		}
 		
 		if choice.Description != "" {
-			s.WriteString(fmt.Sprintf(" - %s", choice.Description))
+			fmt.Fprintf(&s, " - %s", choice.Description)
 		}
 		s.WriteString("\n")
 	}

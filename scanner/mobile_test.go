@@ -15,17 +15,27 @@ func TestFindProjectRootsMobile(t *testing.T) {
 
 	// Create a mock Android project
 	androidDir := filepath.Join(tmp, "my-android-app")
-	os.MkdirAll(androidDir, 0755)
-	os.WriteFile(filepath.Join(androidDir, "build.gradle"), []byte(""), 0644)
+	if err := os.MkdirAll(androidDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(androidDir, "build.gradle"), []byte(""), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a mock iOS project
 	iosDir := filepath.Join(tmp, "my-ios-app")
-	os.MkdirAll(filepath.Join(iosDir, "MyApp.xcodeproj"), 0755)
+	if err := os.MkdirAll(filepath.Join(iosDir, "MyApp.xcodeproj"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a nested web project to ensure we still find it
 	webDir := filepath.Join(tmp, "my-web-app")
-	os.MkdirAll(webDir, 0755)
-	os.WriteFile(filepath.Join(webDir, "package.json"), []byte("{}"), 0644)
+	if err := os.MkdirAll(webDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(webDir, "package.json"), []byte("{}"), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	roots := scanner.FindProjectRoots(tmp)
 

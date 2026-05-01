@@ -72,7 +72,7 @@ func (r *sqliteRepository) GetHistory(ctx context.Context, limit int) ([]domain.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 
 	var reports []domain.ViolationReport
 	for rows.Next() {

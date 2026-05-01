@@ -134,13 +134,9 @@ func (f *Framework) BuildPageTrees(
 		var treeFiles []string
 
 		for _, layout := range chain {
-			for _, f := range scanner.CollectTree(layout, importGraph, visited) {
-				treeFiles = append(treeFiles, f)
-			}
+			treeFiles = append(treeFiles, scanner.CollectTree(layout, importGraph, visited)...)
 		}
-		for _, f := range scanner.CollectTree(page, importGraph, visited) {
-			treeFiles = append(treeFiles, f)
-		}
+		treeFiles = append(treeFiles, scanner.CollectTree(page, importGraph, visited)...)
 
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(page, projectRoot),

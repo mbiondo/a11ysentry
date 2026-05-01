@@ -29,9 +29,7 @@ func (a *blazorAdapter) Ingest(ctx context.Context, files []string) ([]domain.US
 
 		doc, err := html.Parse(bytes.NewReader(content))
 		if err != nil {
-			// .razor files might have @code blocks that break standard HTML parsing
-			// but golang.org/x/net/html is quite robust.
-			// If it fails, we might need a more custom parser.
+			continue
 		}
 
 		nodes := a.traverse(doc, file, string(content))
@@ -111,7 +109,7 @@ func (a *blazorAdapter) renderNode(n *html.Node) string {
 	var buf bytes.Buffer
 	buf.WriteString("<" + n.Data)
 	for _, attr := range n.Attr {
-		buf.WriteString(fmt.Sprintf(" %s=\"%s\"", attr.Key, attr.Val))
+		fmt.Fprintf(&buf, " %s=\"%s\"", attr.Key, attr.Val)
 	}
 	buf.WriteString(">")
 	return buf.String()

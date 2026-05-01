@@ -131,7 +131,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 		// Rule 3: Heading order (WCAG 1.3.1)
 		if node.Role == RoleHeading {
 			level := 0
-			fmt.Sscanf(string(node.UID), "h%d", &level)
+			_, _ = fmt.Sscanf(string(node.UID), "h%d", &level)
 			if level == 1 {
 				hasH1 = true
 			}
@@ -494,7 +494,7 @@ func (a *accessibilityAnalyzer) getLuminance(hex string) float64 {
 		return 0.5
 	}
 	var r, g, b uint8
-	fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
+	_, _ = fmt.Sscanf(hex, "%02x%02x%02x", &r, &g, &b)
 
 	rs := float64(r) / 255.0
 	gs := float64(g) / 255.0

@@ -21,7 +21,6 @@ type MainModel struct {
 	repo       ports.Repository
 	history    list.Model
 	results    domain.ViolationReport
-	err        error
 	terminalW  int
 	terminalH  int
 }

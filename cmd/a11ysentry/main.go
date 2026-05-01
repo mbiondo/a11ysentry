@@ -398,7 +398,7 @@ func runWatch(paths []string, format, platform string, extraCSS []string, repo p
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer watcher.Close()
+	defer watcher.Close() //nolint:errcheck
 
 	for _, p := range paths {
 		_ = watcher.Add(p)
@@ -446,7 +446,9 @@ func handleMCPSubcommand(args []string) {
 	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
 	registerFlag := mcpFlags.Bool("register", false, "Register A11ySentry in AI Agents (Claude, Cursor, etc.)")
 	binaryPath := mcpFlags.String("path", "", "Path to the a11ysentry binary (defaults to current executable)")
-	mcpFlags.Parse(args)
+	if err := mcpFlags.Parse(args); err != nil {
+		log.Fatal(err)
+	}
 
 	if *registerFlag {
 		if *binaryPath == "" {

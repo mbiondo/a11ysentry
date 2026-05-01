@@ -173,7 +173,7 @@ func (a *androidAdapter) parseXML(content string, filename string) []domain.USN 
 					if attr.Name.Local == "layout_width" || attr.Name.Local == "layout_height" {
 						val := strings.TrimSuffix(attr.Value, "dp")
 						var size float64
-						fmt.Sscanf(val, "%f", &size)
+						_, _ = fmt.Sscanf(val, "%f", &size)
 						if size > 0 {
 							key := "width"
 							if attr.Name.Local == "layout_height" {

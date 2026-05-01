@@ -29,7 +29,7 @@ func (m MainModel) resultsView() string {
 	if len(m.results.Violations) == 0 {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("✅ No accessibility violations found!"))
 	} else {
-		b.WriteString(fmt.Sprintf("Found %d violations:\n", len(m.results.Violations)))
+		fmt.Fprintf(&b, "Found %d violations:\n", len(m.results.Violations))
 		for _, v := range m.results.Violations {
 			b.WriteString(violationStyle.Render(
 				fmt.Sprintf("%s [%s]\n%s\n\n%s",

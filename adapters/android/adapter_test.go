@@ -21,9 +21,11 @@ fun Test() {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(tmpfile.Name())
+	defer os.Remove(tmpfile.Name()) //nolint:errcheck
 	
-	os.WriteFile(tmpfile.Name(), []byte(content), 0644)
+	if err := os.WriteFile(tmpfile.Name(), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	nodes, err := adapter.Ingest(context.Background(), []string{tmpfile.Name()})
 	if err != nil {
