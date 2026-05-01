@@ -270,6 +270,10 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 			// Persistence.
 			_ = repo.SaveReport(context.Background(), report)
 
+			if format == "text" && len(report.Violations) > 0 {
+				fmt.Printf("\n  %s\n%s\n", shortPath(f, absDir), domain.ToTOON(report.Violations))
+			}
+
 			reports = append(reports, report)
 			if reportHasErrors(report) {
 				hasErrors = true
