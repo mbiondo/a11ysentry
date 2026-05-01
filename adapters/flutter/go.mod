@@ -1,6 +1,6 @@
 module a11ysentry/adapters/flutter
 
-go 1.24
+go 1.25.0
 
 require (
 	a11ysentry/engine v0.0.0
