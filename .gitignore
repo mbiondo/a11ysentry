@@ -1,6 +1,6 @@
 # Binaries and build artifacts
 *.exe
-a11ysentry
+/a11ysentry
 a11ysentry.exe
 cli/a11ysentry
 cli/a11ysentry.exe
