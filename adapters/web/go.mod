@@ -1,5 +1,5 @@
 module a11ysentry/adapters/web
 
-go 1.25.0
+go 1.24
 
-require golang.org/x/net v0.52.0
+require golang.org/x/net v0.33.0
