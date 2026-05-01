@@ -205,7 +205,7 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 		fmt.Printf("A11ySentry -- Project: %s [%s]\n\n", absDir, fw.Name())
 	}
 
-	uiFiles, cssFiles, err := fw.CollectFiles(absDir)
+	uiFiles, _, err := fw.CollectFiles(absDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 		return
@@ -242,34 +242,39 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 
 		switch fw.Name() {
 		case "Android":
-			adapter = android.NewAdapter()
-			platform = domain.PlatformMobileAndroid
+			adapter = android.NewAndroidAdapter()
+			platform = domain.PlatformAndroidCompose
 		case "iOS":
-			adapter = ios.NewAdapter()
-			platform = domain.PlatformMobileIOS
+			adapter = ios.NewIOSAdapter()
+			platform = domain.PlatformIOSSwiftUI
 		default:
-			adapter = web.NewAdapter()
+			adapter = web.NewHTMLAdapter()
 		}
 
-		pipeline := ports.NewPipeline(adapter)
+		analyzer := domain.NewAnalyzer()
 		for _, f := range tree.Files {
-			content, err := os.ReadFile(f)
+			usns, err := adapter.Ingest(context.Background(), []string{f})
 			if err != nil {
 				continue
 			}
-			report, err := pipeline.Run(context.Background(), content, f, platform, cssFiles...)
+			violations, err := analyzer.Analyze(context.Background(), usns)
 			if err != nil {
 				continue
+			}
+			report := domain.ViolationReport{
+				FilePath:   f,
+				Platform:   platform,
+				Violations: violations,
 			}
 
 			// Persistence.
 			_ = repo.SaveReport(context.Background(), report)
 
 			reports = append(reports, report)
-			if report.HasErrors() {
+			if reportHasErrors(report) {
 				hasErrors = true
 			}
-			if report.HasWarnings() {
+			if reportHasWarnings(report) {
 				hasWarnings = true
 			}
 		}
@@ -286,65 +291,86 @@ func analyzeFiles(paths []string, format, platformName string, extraCSS []string
 	if platformName != "" {
 		switch strings.ToLower(platformName) {
 		case "android":
-			adapter = android.NewAdapter()
-			platform = domain.PlatformMobileAndroid
+			adapter = android.NewAndroidAdapter()
+			platform = domain.PlatformAndroidCompose
 		case "ios":
-			adapter = ios.NewAdapter()
-			platform = domain.PlatformMobileIOS
+			adapter = ios.NewIOSAdapter()
+			platform = domain.PlatformIOSSwiftUI
 		case "flutter":
-			adapter = flutter.NewAdapter()
-			platform = domain.PlatformMobileFlutter
+			adapter = flutter.NewFlutterAdapter()
+			platform = domain.PlatformFlutterDart
 		case "reactnative":
-			adapter = reactnative.NewAdapter()
-			platform = domain.PlatformMobileReactNative
+			adapter = reactnative.NewReactNativeAdapter()
+			platform = domain.PlatformReactNative
 		case "dotnet":
-			adapter = dotnet.NewAdapter()
-			platform = domain.PlatformDesktopDotNet
+			adapter = dotnet.NewDotNetAdapter()
+			platform = domain.PlatformDotNetXAML
 		case "blazor":
-			adapter = blazor.NewAdapter()
-			platform = domain.PlatformWebBlazor
+			adapter = blazor.NewBlazorAdapter()
+			platform = domain.PlatformBlazor
 		case "unity":
-			adapter = unity.NewAdapter()
-			platform = domain.PlatformGamingUnity
+			adapter = unity.NewUnityAdapter()
+			platform = domain.PlatformUnity
 		case "godot":
-			adapter = godot.NewAdapter()
-			platform = domain.PlatformGamingGodot
+			adapter = godot.NewGodotAdapter()
+			platform = domain.PlatformGodot
 		case "javadesktop":
-			adapter = javadesktop.NewAdapter()
-			platform = domain.PlatformDesktopJava
+			adapter = javadesktop.NewJavaDesktopAdapter()
+			platform = domain.PlatformJavaFX
 		default:
-			adapter = web.NewAdapter()
+			adapter = web.NewHTMLAdapter()
 		}
 	} else {
-		adapter = web.NewAdapter()
+		adapter = web.NewHTMLAdapter()
 	}
 
-	pipeline := ports.NewPipeline(adapter)
-
+	analyzer := domain.NewAnalyzer()
 	for _, p := range paths {
 		absPath, _ := filepath.Abs(p)
-		content, err := os.ReadFile(absPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", p, err)
-			continue
-		}
-
-		report, err := pipeline.Run(context.Background(), content, absPath, platform, extraCSS...)
+		usns, err := adapter.Ingest(context.Background(), []string{absPath})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", p, err)
 			continue
 		}
+		violations, err := analyzer.Analyze(context.Background(), usns)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", p, err)
+			continue
+		}
+		report := domain.ViolationReport{
+			FilePath:   absPath,
+			Platform:   platform,
+			Violations: violations,
+		}
 
 		_ = repo.SaveReport(context.Background(), report)
-		reports = append(reports, report)
-		if report.HasErrors() {
-			hasErrors = true
+					reports = append(reports, report)
+			if reportHasErrors(report) {
+				hasErrors = true
+			}
+			if reportHasWarnings(report) {
+				hasWarnings = true
+			}
 		}
-		if report.HasWarnings() {
-			hasWarnings = true
+	return
+}
+
+func reportHasErrors(r domain.ViolationReport) bool {
+	for _, v := range r.Violations {
+		if v.Severity == domain.SeverityError {
+			return true
 		}
 	}
-	return
+	return false
+}
+
+func reportHasWarnings(r domain.ViolationReport) bool {
+	for _, v := range r.Violations {
+		if v.Severity == domain.SeverityWarning {
+			return true
+		}
+	}
+	return false
 }
 
 func printReports(reports []domain.ViolationReport, format string) {
@@ -353,12 +379,12 @@ func printReports(reports []domain.ViolationReport, format string) {
 		data, _ := json.MarshalIndent(reports, "", "  ")
 		fmt.Println(string(data))
 	case "sarif":
-		s := sarif.Generate(reports)
+		s := sarif.FromReports(reports)
 		data, _ := json.MarshalIndent(s, "", "  ")
 		fmt.Println(string(data))
 	default:
 		for _, r := range reports {
-			fmt.Printf("%s\n", r.String())
+			fmt.Printf("%s\n", domain.ToTOON(r.Violations))
 		}
 	}
 }
@@ -424,13 +450,24 @@ func handleMCPSubcommand(args []string) {
 			*binaryPath = exe
 		}
 
-		p := tea.NewProgram(tui.NewMCPRegistrationModel())
+		p := tea.NewProgram(tui.MultiSelectModel{
+			Title: "Register A11ySentry in AI Agents",
+			Choices: []tui.Choice{
+				{Label: "Claude Desktop"},
+				{Label: "Cursor IDE"},
+				{Label: "VSCode (Cline/Roo-Code)"},
+				{Label: "Gemini CLI MCP"},
+				{Label: "Gemini CLI Skill"},
+				{Label: "Qwen"},
+				{Label: "OpenCode"},
+			},
+		})
 		m, err := p.Run()
 		if err != nil {
 			log.Fatalf("Error running registration TUI: %v", err)
 		}
 
-		if m, ok := m.(tui.MCPRegistrationModel); ok && m.Finished {
+		if m, ok := m.(tui.MultiSelectModel); ok && m.Finished {
 			if len(m.Choices) == 0 {
 				fmt.Println("No agents selected for registration.")
 				return
