@@ -20,9 +20,14 @@ if (!(Test-Path $InstallDir)) {
 
 # 3. Download from GitHub or use local if in DEV MODE
 $BinaryFull = Join-Path $InstallDir $BinaryName
-$LocalBinary = Join-Path $PSScriptRoot "cmd\a11ysentry\a11ysentry.exe"
 
-if (Test-Path $LocalBinary) {
+# Handle $PSScriptRoot being empty when running via IEX
+$LocalBinary = $null
+if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
+    $LocalBinary = Join-Path $PSScriptRoot "cmd\a11ysentry\a11ysentry.exe"
+}
+
+if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
     Copy-Item $LocalBinary -Destination $BinaryFull -Force
     Write-Host "🚧 DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
 } else {
@@ -82,9 +87,13 @@ if (Test-Path $BinaryFull) {
     & $BinaryFull mcp --register
     
     # 6. Skill Registration
-    $SkillSource = Join-Path $PSScriptRoot "skills\a11ysentry-mcp"
+    $SkillSource = $null
+    if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
+        $SkillSource = Join-Path $PSScriptRoot "skills\a11ysentry-mcp"
+    }
+    
     $AgentSkillsDir = Join-Path $env:USERPROFILE ".gemini\skills\a11ysentry-mcp"
-    if (Test-Path $SkillSource) {
+    if ($null -ne $SkillSource -and (Test-Path $SkillSource)) {
         if (!(Test-Path $AgentSkillsDir)) {
             New-Item -ItemType Directory -Path $AgentSkillsDir -Force | Out-Null
         }
