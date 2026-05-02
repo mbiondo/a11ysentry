@@ -53,12 +53,9 @@ const baseUrl = import.meta.env.BASE_URL;
             </nav>
         </header>
 
-		<main id="main-content">
-		    <slot />
-        </main>
+		<slot />
 
-        <footer class="py-20 border-t border-slate-900 bg-black/20" role="contentinfo">
-            <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+		<footer class="py-20 border-t border-slate-900 bg-black/20" role="contentinfo" aria-label="Main Footer">            <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
                 <div class="space-y-4">
                     <div class="text-xl font-bold tracking-tighter flex items-center justify-center md:justify-start gap-2">
                         <span class="text-neon-cyan">🛡️</span> a11ysentry
