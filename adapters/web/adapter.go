@@ -191,6 +191,38 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				IsComponent: isComponent,
 			},
 		}
+
+		// 0. Override Role if explicit ARIA role is present
+		if ariaRole := a.getAttribute(n, "role"); ariaRole != "" {
+			switch ariaRole {
+			case "button":
+				usn.Role = domain.RoleButton
+			case "link":
+				usn.Role = domain.RoleLink
+			case "heading":
+				usn.Role = domain.RoleHeading
+			case "dialog", "alertdialog":
+				usn.Role = domain.RoleModal
+			case "main":
+				usn.Role = domain.RoleMain
+			case "navigation":
+				usn.Role = domain.RoleNav
+			case "complementary":
+				usn.Role = domain.RoleAside
+			case "banner":
+				usn.Role = domain.RoleHeader
+			case "contentinfo":
+				usn.Role = domain.RoleFooter
+			case "region":
+				usn.Role = domain.RoleSection
+			case "form":
+				usn.Role = domain.RoleForm
+			case "search":
+				usn.Role = domain.RoleSearch
+			case "status", "alert", "log":
+				usn.Role = domain.RoleLiveRegion
+			}
+		}
 		if usn.UID == "" {
 			usn.UID = n.Data
 		}
@@ -369,8 +401,28 @@ func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
 		return domain.RoleHeading
 	case "img":
 		return domain.RoleImage
-	case "input":
+	case "input", "select", "textarea":
 		return domain.RoleInput
+	case "main":
+		return domain.RoleMain
+	case "nav":
+		return domain.RoleNav
+	case "aside":
+		return domain.RoleAside
+	case "header":
+		return domain.RoleHeader
+	case "footer":
+		return domain.RoleFooter
+	case "section":
+		return domain.RoleSection
+	case "form":
+		return domain.RoleForm
+	case "search":
+		return domain.RoleSearch
+	case "fieldset":
+		return domain.RoleFieldset
+	case "legend":
+		return domain.RoleLegend
 	default:
 		return "generic"
 	}

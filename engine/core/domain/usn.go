@@ -11,6 +11,20 @@ const (
 	RoleImage      SemanticRole = "image"
 	RoleLiveRegion SemanticRole = "live-region"
 	RoleModal      SemanticRole = "modal"
+
+	// Landmarks
+	RoleMain    SemanticRole = "main"
+	RoleNav     SemanticRole = "navigation"
+	RoleAside   SemanticRole = "complementary"
+	RoleHeader  SemanticRole = "banner"
+	RoleFooter  SemanticRole = "contentinfo"
+	RoleSection SemanticRole = "region"
+	RoleForm    SemanticRole = "form"
+	RoleSearch  SemanticRole = "search"
+
+	// Groups
+	RoleFieldset SemanticRole = "fieldset"
+	RoleLegend   SemanticRole = "legend"
 )
 
 // Platform represents the source framework or operating system.

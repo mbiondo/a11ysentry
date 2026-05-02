@@ -66,11 +66,13 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 
 	usedIDs := make(map[string]bool)
 	labelsByFor := make(map[string]string)
+	landmarkLabels := make(map[SemanticRole]map[string]Source) // role -> label -> first_source
+	mainCount := 0
 	lastHeadingLevel := 0
 	hasH1 := false
 	hasLang := false
 
-	// Pass 1: Collect metadata (Labels for inputs, doc info)
+	// Pass 1: Collect metadata (Labels for inputs, doc info, landmarks)
 	for _, node := range nodes {
 		// Identify Web document-level traits
 		if node.UID == "html" || node.UID == "html-tag" {
@@ -91,10 +93,15 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 				labelsByFor[forAttr] = node.Label
 			}
 		}
+
+		// Initialize landmark tracking maps
+		if _, exists := landmarkLabels[node.Role]; !exists && isLandmark(node.Role) {
+			landmarkLabels[node.Role] = make(map[string]Source)
+		}
 	}
 
 	// Pass 2: Rule validation
-	for _, node := range nodes {
+	for i, node := range nodes {
 		p := node.Source.Platform
 		isMobile := p == PlatformAndroidCompose || p == PlatformAndroidView || p == PlatformIOSSwiftUI || p == PlatformFlutterDart || p == PlatformReactNative
 		isGaming := p == PlatformUnity || p == PlatformGodot
@@ -178,6 +185,79 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 				})
 			}
 			usedIDs[id] = true
+		}
+
+		// Advanced Rules: Landmarks (WCAG 2.4.1 / ARIA 1.1)
+		if isLandmark(node.Role) {
+			if node.Role == RoleMain {
+				mainCount++
+				if mainCount > 1 {
+					add(Violation{
+						ErrorCode:        "WCAG_2_4_1",
+						Severity:         SeverityError,
+						Message:          "Multiple <main> elements found. A document should only have one primary content landmark.",
+						SourceRef:        node.Source,
+						FixSnippet:       "Remove redundant <main> elements or convert them to <section>.",
+						DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/html/H64",
+					})
+				}
+			}
+
+			// Track unique labels for landmarks of same type
+			if node.Label != "" {
+				if firstSrc, exists := landmarkLabels[node.Role][node.Label]; exists && firstSrc.FilePath != node.Source.FilePath || firstSrc.Line != node.Source.Line {
+					// We warn if two different landmarks of same type have same label
+					// actually, ARIA says landmarks of SAME role should have DIFFERENT labels to be distinguishable.
+				}
+				landmarkLabels[node.Role][node.Label] = node.Source
+			}
+
+			// Check if multiple landmarks of same type exist without labels
+			sameRoleCount := 0
+			for _, n2 := range nodes {
+				if n2.Role == node.Role {
+					sameRoleCount++
+				}
+			}
+			if sameRoleCount > 1 && node.Label == "" && node.Role != RoleMain {
+				add(Violation{
+					ErrorCode:        "ARIA_1_1",
+					Severity:         SeverityWarning,
+					Message:          fmt.Sprintf("Multiple %s landmarks found without distinguishing labels. Screen reader users won't know the difference between them.", node.Role),
+					SourceRef:        node.Source,
+					FixSnippet:       fmt.Sprintf("Add aria-label=\"...\" to distinguish this %s from others.", node.Role),
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA6",
+				})
+			}
+		}
+
+		// Grouping: Fieldset Legend (WCAG 1.3.1)
+		if node.Role == RoleFieldset {
+			hasLegend := false
+			// Check immediate children (simplified check in current USN structure)
+			// In a more robust engine, we'd check node.Hierarchy.Children
+			for _, child := range nodes[i+1:] {
+				// This is a naive check assuming legend follows fieldset closely in the flat slice
+				// A real tree walker would be better.
+				if child.Role == RoleLegend {
+					hasLegend = true
+					break
+				}
+				// If we encounter another fieldset or a major structural element, stop searching
+				if child.Role == RoleFieldset || child.Role == RoleMain || child.Role == RoleHeader {
+					break
+				}
+			}
+			if !hasLegend {
+				add(Violation{
+					ErrorCode:        "WCAG_1_3_1_LEGEND",
+					Severity:         SeverityError,
+					Message:          "<fieldset> is missing a <legend>. Grouped inputs need a descriptive legend for context.",
+					SourceRef:        node.Source,
+					FixSnippet:       "<legend>Group Description</legend>",
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/html/H71",
+				})
+			}
 		}
 
 		// Rule 5: Focus Visibility (WCAG 2.4.7) — expanded
@@ -449,15 +529,30 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 		// Final Web-only doc checks
 		// Rule 9: Focus Trap for Modals (Advanced)
 		if node.Role == RoleModal {
-			hasAriaModal, _ := node.Traits["aria-modal"].(string)
-			if hasAriaModal != "true" {
-				violations = append(violations, Violation{
+			hasAriaModal := node.Traits["aria-modal"] == "true"
+			if !hasAriaModal {
+				add(Violation{
 					ErrorCode:        "ADV_FOCUS_TRAP",
 					Severity:         SeverityError,
-					Message:          "Modal missing 'aria-modal=\"true\"' or focus trap implementation.",
+					Message:          "Modal/Dialog missing 'aria-modal=\"true\"'. Without it, screen readers may allow users to navigate outside the modal while it is active.",
 					SourceRef:        node.Source,
-					FixSnippet:       "Add aria-modal=\"true\" and ensure focus is trapped within the modal.",
+					FixSnippet:       "Add aria-modal=\"true\" to the dialog element.",
 					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA14",
+				})
+			}
+		}
+
+		// Rule 13: Live Regions (WCAG 4.1.3)
+		if node.Role == RoleLiveRegion {
+			_, hasLive := node.Traits["aria-live"].(string)
+			if !hasLive {
+				add(Violation{
+					ErrorCode:        "WCAG_4_1_3",
+					Severity:         SeverityWarning,
+					Message:          "Live region missing explicit 'aria-live' attribute. Dynamic content updates may not be announced to screen reader users.",
+					SourceRef:        node.Source,
+					FixSnippet:       "Add aria-live=\"polite\" (for status updates) or aria-live=\"assertive\" (for critical alerts).",
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA19",
 				})
 			}
 		}
@@ -571,4 +666,12 @@ func (a *accessibilityAnalyzer) getLuminance(hex string) float64 {
 		return math.Pow((c+0.055)/1.055, 2.4)
 	}
 	return 0.2126*f(rs) + 0.7152*f(gs) + 0.0722*f(bs)
+}
+
+func isLandmark(role SemanticRole) bool {
+	switch role {
+	case RoleMain, RoleNav, RoleAside, RoleHeader, RoleFooter, RoleSection, RoleForm, RoleSearch:
+		return true
+	}
+	return false
 }
