@@ -11,7 +11,9 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/progress"
+	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 type sessionState int
@@ -29,6 +31,7 @@ type MainModel struct {
 	projectsList    list.Model
 	reportsList     list.Model
 	progress        progress.Model
+	viewport        viewport.Model
 	allReports      []domain.ViolationReport
 	selectedProject string
 	results         domain.ViolationReport
@@ -45,6 +48,7 @@ func NewMainModel(repo ports.Repository) MainModel {
 		projectsList: list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0),
 		reportsList:  list.New([]list.Item{}, list.NewDefaultDelegate(), 0, 0),
 		progress:     progress.New(progress.WithDefaultGradient()),
+		viewport:     viewport.New(0, 0),
 	}
 }
 
@@ -96,6 +100,11 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.terminalH = msg.Height
 		m.projectsList.SetSize(msg.Width-4, msg.Height-6)
 		m.reportsList.SetSize(msg.Width-4, msg.Height-6)
+		m.viewport.Width = msg.Width - 4
+		m.viewport.Height = msg.Height - 6
+		if m.state == stateResults {
+			m.viewport.SetContent(m.resultsView())
+		}
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -121,6 +130,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if i, ok := m.reportsList.SelectedItem().(reportItem); ok {
 					m.results = i.report
 					m.state = stateResults
+					m.viewport.SetContent(m.resultsView())
+					m.viewport.YOffset = 0
 					return m, nil
 				}
 			}
@@ -132,6 +143,8 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.projectsList, cmd = m.projectsList.Update(msg)
 	case stateProjectReports:
 		m.reportsList, cmd = m.reportsList.Update(msg)
+	case stateResults:
+		m.viewport, cmd = m.viewport.Update(msg)
 	}
 
 	return m, cmd
@@ -180,7 +193,9 @@ func (m MainModel) View() string {
 	case stateAnalyzing:
 		return m.progressView()
 	case stateResults:
-		return m.resultsView()
+		header := headerStyle.Render(fmt.Sprintf("🛡️  Analysis Results: %s", m.results.FilePath))
+		footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).Padding(0, 2).Render("press 'esc' to return • 'q' to quit • use arrows/pgup/pgdn to scroll")
+		return docStyle.Render(header + "\n\n" + m.viewport.View() + "\n" + footer)
 	default:
 		return "Initializing..."
 	}

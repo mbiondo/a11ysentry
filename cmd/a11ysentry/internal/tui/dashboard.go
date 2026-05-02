@@ -2,7 +2,6 @@ package tui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -13,62 +12,39 @@ var (
 			Bold(true).
 			Padding(1, 2)
 
-	sidebarStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder(), false, true, false, false).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			MarginRight(1)
-
-	mainContentStyle = lipgloss.NewStyle().Padding(0, 1)
+	mainStyle = lipgloss.NewStyle().
+			Padding(0, 2)
 
 	docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+	dashboardTitleStyle = lipgloss.NewStyle().
+			Background(lipgloss.Color("#00ADD8")).
+			Foreground(lipgloss.Color("#FFFFFF")).
+			Bold(true).
+			Padding(0, 1).
+			MarginBottom(1)
 )
-
-func (m MainModel) sidebarView() string {
-	// Simple sidebar showing the current project if any, and some stats
-	var s strings.Builder
-	s.WriteString(lipgloss.NewStyle().Bold(true).Underline(true).Render("PROJECTS"))
-	s.WriteString("\n\n")
-
-	// Highlight current selection in sidebar context if we are in reports view
-	for _, item := range m.projectsList.Items() {
-		p := item.(projectItem)
-		if m.state != stateProjects && p.name == m.selectedProject {
-			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Render("> " + p.name))
-		} else {
-			s.WriteString("  " + p.name)
-		}
-		s.WriteString("\n")
-	}
-
-	return sidebarStyle.Render(s.String())
-}
 
 func (m MainModel) projectsView() string {
 	header := headerStyle.Render("🛡️  A11ySentry Dashboard")
-	
-	// Create a two-column layout: Sidebar with project names, and Main with the interactive list
-	sidebar := m.sidebarView()
-	content := m.projectsList.View()
 
-	combined := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
-	
-	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingTop(1).Render("press 'q' to quit • 'enter' to view project reports")
+	m.projectsList.SetSize(m.terminalW-4, m.terminalH-8)
+	mainView := mainStyle.Width(m.terminalW - 4).Render(m.projectsList.View())
 
-	return docStyle.Render(header + "\n\n" + combined + "\n" + footer)
+	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingTop(1).Render("q: quit • enter: view reports")
+
+	return docStyle.Render(header + "\n\n" + mainView + "\n" + footer)
 }
 
 func (m MainModel) reportsView() string {
 	header := headerStyle.Render(fmt.Sprintf("📂 Project: %s", m.selectedProject))
-	
-	sidebar := m.sidebarView()
-	content := m.reportsList.View()
 
-	combined := lipgloss.JoinHorizontal(lipgloss.Top, sidebar, content)
-	
-	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingTop(1).Render("press 'esc' to back • 'enter' to view details")
+	m.reportsList.SetSize(m.terminalW-4, m.terminalH-8)
+	mainView := mainStyle.Width(m.terminalW - 4).Render(m.reportsList.View())
 
-	return docStyle.Render(header + "\n\n" + combined + "\n" + footer)
+	footer := lipgloss.NewStyle().Foreground(lipgloss.Color("241")).PaddingTop(1).Render("esc: back • enter: details")
+
+	return docStyle.Render(header + "\n\n" + mainView + "\n" + footer)
 }
 
 func (m MainModel) progressView() string {

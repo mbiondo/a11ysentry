@@ -18,11 +18,51 @@ if (!(Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-# 3. DEV MODE: Copy if exists locally
-$WorkspaceBinary = Join-Path $PSScriptRoot "cmd\a11ysentry\a11ysentry.exe"
-if (Test-Path $WorkspaceBinary) {
-    Copy-Item $WorkspaceBinary -Destination (Join-Path $InstallDir $BinaryName) -Force
-    Write-Host "🚧 DEV MODE: Copied binary from cmd\a11ysentry\." -ForegroundColor Yellow
+# 3. Download from GitHub or use local if in DEV MODE
+$BinaryFull = Join-Path $InstallDir $BinaryName
+$LocalBinary = Join-Path $PSScriptRoot "cmd\a11ysentry\a11ysentry.exe"
+
+if (Test-Path $LocalBinary) {
+    Copy-Item $LocalBinary -Destination $BinaryFull -Force
+    Write-Host "🚧 DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
+} else {
+    Write-Host "📥 Downloading latest release from GitHub..." -ForegroundColor Cyan
+    $LatestReleaseUrl = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
+    try {
+        $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -UseBasicParsing
+        $Tag = $ReleaseInfo.tag_name
+        $Asset = $ReleaseInfo.assets | Where-Object { $_.name -like "*windows_$Arch.zip" } | Select-Object -First 1
+        
+        if ($null -eq $Asset) {
+            throw "Could not find a valid Windows $Arch asset in the latest release ($Tag)."
+        }
+
+        $DownloadUrl = $Asset.browser_download_url
+        $TempZip = Join-Path $env:TEMP "a11ysentry.zip"
+        
+        Invoke-WebRequest -Uri $DownloadUrl -OutFile $TempZip -UseBasicParsing
+        
+        # Extract
+        Expand-Archive -Path $TempZip -DestinationPath $env:TEMP -Force
+        $ExtractedBinary = Join-Path $env:TEMP $BinaryName
+        if (Test-Path $ExtractedBinary) {
+            Move-Item $ExtractedBinary -Destination $BinaryFull -Force
+        } else {
+            # GoReleaser might nest it or use a different folder structure in the zip
+            $Files = Get-ChildItem -Path $env:TEMP -Filter $BinaryName -Recurse
+            if ($Files.Count -gt 0) {
+                Move-Item $Files[0].FullName -Destination $BinaryFull -Force
+            } else {
+                throw "Binary not found inside the downloaded archive."
+            }
+        }
+        
+        Remove-Item $TempZip -ErrorAction SilentlyContinue
+        Write-Host "Successfully installed A11ySentry $Tag." -ForegroundColor Green
+    } catch {
+        Write-Error "Failed to download or install A11ySentry: $_"
+        exit 1
+    }
 }
 
 # 4. Add to PATH

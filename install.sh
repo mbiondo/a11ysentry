@@ -25,15 +25,55 @@ esac
 INSTALL_DIR="$HOME/.a11ysentry/bin"
 mkdir -p "$INSTALL_DIR"
 
-# 3. Download (Logic ready for production)
-URL="https://github.com/$OWNER/$REPO/releases/latest/download/a11ysentry_${OS}_${ARCH}.tar.gz"
-echo -e "\033[0;90m📥 Preparation for download from $URL\033[0m"
+# 3. Download from GitHub or use local if in DEV MODE
+BINARY_FULL="$INSTALL_DIR/$BINARY_NAME"
+LOCAL_BINARY="./cmd/a11ysentry/a11ysentry"
 
-# DEV MODE: Copy if exists locally
-if [ -f "./cmd/a11ysentry/a11ysentry" ]; then
-    cp "./cmd/a11ysentry/a11ysentry" "$INSTALL_DIR/$BINARY_NAME"
-    chmod +x "$INSTALL_DIR/$BINARY_NAME"
-    echo -e "\033[0;33m🚧 DEV MODE: Copied binary from cmd/a11ysentry/.\033[0m"
+if [ -f "$LOCAL_BINARY" ]; then
+    cp "$LOCAL_BINARY" "$BINARY_FULL"
+    chmod +x "$BINARY_FULL"
+    echo -e "\033[0;33m🚧 DEV MODE: Copied binary from local workspace.\033[0m"
+else
+    echo -e "\033[0;36m📥 Downloading latest release from GitHub...\033[0m"
+    
+    # Get latest release tag
+    LATEST_RELEASE_JSON=$(curl -s "https://api.github.com/repos/$OWNER/$REPO/releases/latest")
+    TAG=$(echo "$LATEST_RELEASE_JSON" | grep -m 1 '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    
+    if [ -z "$TAG" ]; then
+        echo -e "\033[0;31m❌ Could not determine latest release tag.\033[0m"
+        exit 1
+    fi
+
+    # Find the right asset (tar.gz)
+    ASSET_URL=$(echo "$LATEST_RELEASE_JSON" | grep "browser_download_url" | grep "${OS}_${ARCH}" | grep "tar.gz" | head -n 1 | sed -E 's/.*"([^"]+)".*/\1/')
+
+    if [ -z "$ASSET_URL" ]; then
+        echo -e "\033[0;31m❌ Could not find a valid asset for ${OS}_${ARCH} in release $TAG.\033[0m"
+        exit 1
+    fi
+
+    TEMP_TAR="/tmp/a11ysentry.tar.gz"
+    curl -L "$ASSET_URL" -o "$TEMP_TAR"
+    
+    # Extract to a temp dir and move binary
+    TEMP_DIR=$(mktemp -d)
+    tar -xzf "$TEMP_TAR" -C "$TEMP_DIR"
+    
+    # Find binary (it might be in a subfolder depending on GoReleaser config)
+    EXTRACTED=$(find "$TEMP_DIR" -name "$BINARY_NAME" -type f | head -n 1)
+    
+    if [ -n "$EXTRACTED" ]; then
+        mv "$EXTRACTED" "$BINARY_FULL"
+        chmod +x "$BINARY_FULL"
+        echo -e "\033[0;32m✅ Successfully installed A11ySentry $TAG.\033[0m"
+    else
+        echo -e "\033[0;31m❌ Binary not found in downloaded archive.\033[0m"
+        exit 1
+    fi
+    
+    rm "$TEMP_TAR"
+    rm -rf "$TEMP_DIR"
 fi
 
 # 4. Add to PATH (Update .bashrc or .zshrc)
