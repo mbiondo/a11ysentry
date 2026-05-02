@@ -28,12 +28,30 @@ var (
 			Bold(true)
 )
 
+func getTopIssue(counts map[string]int) string {
+	max := 0
+	top := "None"
+	for code, count := range counts {
+		if count > max {
+			max = count
+			top = code
+		}
+	}
+	if max > 0 {
+		return fmt.Sprintf("%s (%d occurrences)", top, max)
+	}
+	return top
+}
+
 func (m MainModel) resultsView() string {
 	var b strings.Builder
 
 	if len(m.results.Violations) == 0 {
 		return successStyle.Render("  ✅ No accessibility violations found! Excellent work.")
 	}
+
+	badge := getPlatformBadge(string(m.results.Platform))
+	fmt.Fprintf(&b, " %s %s\n\n", badge, lipgloss.NewStyle().Bold(true).Render(m.results.FilePath))
 
 	isNarrow := m.terminalW < 80
 	contentWidth := m.terminalW - 12
@@ -43,17 +61,24 @@ func (m MainModel) resultsView() string {
 
 	errors := 0
 	warnings := 0
+	errorTypes := make(map[string]int)
 	for _, v := range m.results.Violations {
 		if v.Severity == "error" {
 			errors++
 		} else {
 			warnings++
 		}
+		errorTypes[v.ErrorCode]++
 	}
 
-	summary := fmt.Sprintf("Found %d issues (%d errors, %d warnings)\n", len(m.results.Violations), errors, warnings)
-	b.WriteString(lipgloss.NewStyle().Bold(true).PaddingLeft(2).Render(summary))
-	b.WriteString("\n")
+	summaryCard := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("#00ADD8")).
+		Padding(0, 1).
+		Width(contentWidth).
+		Render(fmt.Sprintf("SUMMARY\n\n🔴 %d Errors  🟠 %d Warnings\nTop Issue: %s", errors, warnings, getTopIssue(errorTypes)))
+
+	b.WriteString(summaryCard + "\n\n")
 
 	for _, v := range m.results.Violations {
 		var severityTag string

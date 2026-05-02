@@ -16,9 +16,27 @@ func NewIOSAdapter() ports.Adapter {
 	return &iosAdapter{}
 }
 
+func (a *iosAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	var res []string
+	info, err := os.Stat(node.FilePath)
+	if err == nil && !info.IsDir() {
+		res = append(res, node.FilePath)
+	}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
+}
+
 func (a *iosAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
 	files := a.flatten(root)
 	var allNodes []domain.USN
+	if len(files) == 0 {
+		return nil, nil
+	}
 	nodeChan := make(chan []domain.USN, len(files))
 	errChan := make(chan error, len(files))
 
@@ -52,17 +70,6 @@ func (a *iosAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domai
 	return allNodes, nil
 }
 
-func (a *iosAdapter) flatten(node *domain.FileNode) []string {
-	if node == nil {
-		return nil
-	}
-	res := []string{node.FilePath}
-	for _, c := range node.Children {
-		res = append(res, a.flatten(c)...)
-	}
-	return res
-}
-
 // parseSwiftUI identifies SwiftUI components and accessibility modifiers.
 func (a *iosAdapter) parseSwiftUI(content string, filename string) []domain.USN {
 	var nodes []domain.USN
@@ -77,8 +84,6 @@ func (a *iosAdapter) parseSwiftUI(content string, filename string) []domain.USN 
 		trimmed := strings.TrimSpace(line)
 
 		if matches := imageRegex.FindStringSubmatch(trimmed); matches != nil {
-// ... (omitted, but I need to provide the context)
-// ... (omitted for brevity in instruction, but keep logic)
 			imageName := matches[1]
 			label := "" 
 			lookAhead := 3

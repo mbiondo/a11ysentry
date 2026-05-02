@@ -16,9 +16,29 @@ func NewFlutterAdapter() ports.Adapter {
 	return &flutterAdapter{}
 }
 
+func (a *flutterAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	var res []string
+	if node.FilePath != "" {
+		info, err := os.Stat(node.FilePath)
+		if err == nil && !info.IsDir() {
+			res = append(res, node.FilePath)
+		}
+	}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
+}
+
 func (a *flutterAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
 	files := a.flatten(root)
 	var allNodes []domain.USN
+	if len(files) == 0 {
+		return nil, nil
+	}
 	nodeChan := make(chan []domain.USN, len(files))
 	errChan := make(chan error, len(files))
 
@@ -49,42 +69,51 @@ func (a *flutterAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]d
 	return allNodes, nil
 }
 
-func (a *flutterAdapter) flatten(node *domain.FileNode) []string {
-	if node == nil {
-		return nil
-	}
-	res := []string{node.FilePath}
-	for _, c := range node.Children {
-		res = append(res, a.flatten(c)...)
-	}
-	return res
-}
-
 func (a *flutterAdapter) parseDart(content string, filename string) []domain.USN {
 	var nodes []domain.USN
 	lines := strings.Split(content, "\n")
 
-	// Regex for Semantics(label: "...")
-	semanticsRegex := regexp.MustCompile(`Semantics\s*\(\s*[^)]*label\s*:\s*\"([^\"]*)\"`)
-	// Regex for Text("...")
+	semanticsStartRegex := regexp.MustCompile(`Semantics\s*\(`)
+	labelRegex := regexp.MustCompile(`label\s*:\s*\"([^\"]*)\"`)
 	textRegex := regexp.MustCompile(`Text\s*\(\s*\"([^\"]*)\"`)
-	// Regex for Image.asset(..., semanticLabel: "...")
-	imageRegex := regexp.MustCompile(`Image\s*\.[^(\n]*\(\s*[^)]*semanticLabel\s*:\s*\"([^\"]*)\"`)
+	imageStartRegex := regexp.MustCompile(`Image\.(asset|network|file|memory)\s*\(`)
+	semanticLabelRegex := regexp.MustCompile(`semanticLabel\s*:\s*\"([^\"]*)\"`)
+	excludeSemanticsRegex := regexp.MustCompile(`excludeSemantics\s*:\s*true`)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
-		// Skip comment lines — single-line (//) and block comment markers (/* * */)
 		if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") || strings.HasPrefix(trimmed, "*") {
 			continue
 		}
 
 		// Match Semantics
-		if matches := semanticsRegex.FindStringSubmatch(trimmed); matches != nil {
+		if semanticsStartRegex.MatchString(trimmed) {
+			label := ""
+			isExclude := false
+			lookAhead := 10
+			block := ""
+			for j := i; j < i+lookAhead && j < len(lines); j++ {
+				block += lines[j] + " "
+			}
+			
+			if m := labelRegex.FindStringSubmatch(block); m != nil {
+				label = m[1]
+			}
+			if excludeSemanticsRegex.MatchString(block) {
+				isExclude = true
+			}
+
+			traits := make(map[string]any)
+			if isExclude {
+				traits["aria-hidden"] = "true"
+			}
+
 			nodes = append(nodes, domain.USN{
-				UID:   fmt.Sprintf("%s-flutter-semantics-%d", filename, i),
-				Role:  domain.RoleLiveRegion, // Placeholder for semantic wrapper
-				Label: matches[1],
+				UID:    fmt.Sprintf("%s-flutter-semantics-%d", filename, i),
+				Role:   domain.RoleLiveRegion,
+				Label:  label,
+				Traits: traits,
 				Source: domain.Source{
 					Platform: domain.PlatformFlutterDart,
 					FilePath: filename,
@@ -96,11 +125,22 @@ func (a *flutterAdapter) parseDart(content string, filename string) []domain.USN
 		}
 
 		// Match Images
-		if matches := imageRegex.FindStringSubmatch(trimmed); matches != nil {
+		if imageStartRegex.MatchString(trimmed) {
+			label := ""
+			lookAhead := 10
+			block := ""
+			for j := i; j < i+lookAhead && j < len(lines); j++ {
+				block += lines[j] + " "
+			}
+
+			if m := semanticLabelRegex.FindStringSubmatch(block); m != nil {
+				label = m[1]
+			}
+
 			nodes = append(nodes, domain.USN{
 				UID:   fmt.Sprintf("%s-flutter-img-%d", filename, i),
 				Role:  domain.RoleImage,
-				Label: matches[1],
+				Label: label,
 				Source: domain.Source{
 					Platform: domain.PlatformFlutterDart,
 					FilePath: filename,
@@ -111,34 +151,20 @@ func (a *flutterAdapter) parseDart(content string, filename string) []domain.USN
 			})
 		}
 
-		// Match Buttons (ElevatedButton, TextButton, IconButton)
-		if strings.Contains(trimmed, "Button") && !strings.Contains(trimmed, "ButtonStyle") {
+		// Match Buttons
+		if (strings.Contains(trimmed, "Button") || strings.Contains(trimmed, "IconButton")) && 
+			!strings.Contains(trimmed, "ButtonStyle") && !strings.Contains(trimmed, "import") {
 			label := ""
-			// Look ahead for Text() or Semantics label
-			lookAhead := 5
+			lookAhead := 10
+			block := ""
 			for j := i; j < i+lookAhead && j < len(lines); j++ {
-				if m := textRegex.FindStringSubmatch(lines[j]); m != nil {
-					label = m[1]
-					break
-				}
-				if m := semanticsRegex.FindStringSubmatch(lines[j]); m != nil {
-					label = m[1]
-					break
-				}
+				block += lines[j] + " "
 			}
-			// If no label found ahead, also look backward for a Semantics wrapper
-			// (e.g. Semantics(label: "...") wrapping a child: IconButton(...))
-			// Join lines into a block to handle multi-line Semantics declarations.
-			if label == "" {
-				lookBack := 5
-				start := i - lookBack
-				if start < 0 {
-					start = 0
-				}
-				backBlock := strings.Join(lines[start:i], " ")
-				if m := semanticsRegex.FindStringSubmatch(backBlock); m != nil {
-					label = m[1]
-				}
+
+			if m := textRegex.FindStringSubmatch(block); m != nil {
+				label = m[1]
+			} else if m := labelRegex.FindStringSubmatch(block); m != nil {
+				label = m[1]
 			}
 
 			nodes = append(nodes, domain.USN{

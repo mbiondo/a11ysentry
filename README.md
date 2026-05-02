@@ -1,7 +1,7 @@
 # 🛡️ A11ySentry
 ### Universal Accessibility Engine for Multi-Platform UI
 
-A11ySentry is a deterministic, multi-platform accessibility validator. It provides a single semantic source of truth for all major UI frameworks.
+A11ySentry is a deterministic, multi-platform accessibility validator. It provides a single semantic source of truth for all major UI frameworks using the **Universal Semantic Node (USN)** abstraction.
 
 [![CI/CD Pipeline](https://github.com/mbiondo/a11ysentry/actions/workflows/go.yml/badge.svg)](https://github.com/mbiondo/a11ysentry/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,31 +9,34 @@ A11ySentry is a deterministic, multi-platform accessibility validator. It provid
 ---
 
 ## 🚀 The Vision
-Most accessibility tools are platform-locked. A11ySentry introduces the **Universal Semantic Node (USN)**: an abstraction layer that allows the same WCAG 2.2 rules to validate over **15 platforms** with 100% deterministic certainty.
+Most accessibility tools are platform-locked and rely on brittle heuristics or slow LLMs. A11ySentry introduces a **pure engineering approach**: a high-performance engine that translates any UI (Web, Mobile, Desktop, Gaming) into a common semantic language (USN) and applies a unified set of **deterministic WCAG 2.2 rules**.
 
 ## 🛠️ Key Features
-- **Massive Platform Support**:
-  - **Web**: React, Vue, Svelte, Angular, Astro.
-  - **Mobile**: Android (Compose/View), iOS (SwiftUI), React Native, Flutter.
-  - **Desktop**: .NET (MAUI/WPF), Java (FX/Swing), Electron, Tauri.
-  - **Gaming**: Unity, Godot.
-- **Recursive Component Context**: Analyzes entire component trees (Page + Components) to avoid false positives by cross-referencing labels and states across files.
-- **Tailwind 4 Support**: Built-in heuristic mapping for Tailwind CSS 4 utility classes (colors, spacing, etc.) for zero-runtime static analysis.
-- **WCAG 2.2 Ready**: Implements the latest accessibility standards, including the new Web Touch Target (24px), Aria State requirements, and **advanced keyboard navigation (WCAG 2.1.1)**.
-- **Advanced Semantic Rules**: New rules for landmarks, modals, and fieldsets to ensure deeper structural accessibility.
-- **Engine v2 Context**: Hierarchical FileNode analysis that allows components to inherit accessibility context from their parents (e.g., labels from modals to inputs).
-- **Unified CLI**: Analyze files, view history in TUI, or start MCP from a single binary.
-- **Interactive TUI Dashboard**: Visual dashboard for audit history and violation tracking.
-- **Universal MCP Support**: Register A11ySentry in **Claude, Cursor, VS Code, Gemini CLI, Qwen-Coder, and OpenCode** with one command.
-- **Deterministic Engine**: Pure engineering-based validation (no LLM hallucinations).
-- **High Precision**: Reports exact file path, line, and column for every violation.
+
+### 🌍 Massive Platform Support
+- **Web**: React, Vue, Svelte, Angular, Astro (with automatic layout-chain resolution).
+- **Mobile**: Android (Compose/XML), iOS (SwiftUI/UIKit), **React Native**, and **Flutter**.
+- **Desktop**: .NET (MAUI/WPF), Java (FX/Swing), Electron, Tauri.
+- **Gaming**: Unity, Godot.
+
+### 🧠 Intelligent Analysis
+- **Recursive Context**: Analyzes entire component trees. Accessibility states like `aria-hidden` (Web), `importantForAccessibility` (Android), or `excludeSemantics` (Flutter) are propagated down the tree to detect keyboard focus traps.
+- **Structural Link Purpose (WCAG 2.4.4)**: A language-agnostic rule that detects ambiguous links (same label, different destination) without needing hardcoded dictionaries or LLMs.
+- **Advanced Semantic Rules**: Specialized validation for landmarks, modals (focus traps), fieldsets, and redundant titles.
+- **Tailwind 4 & CSS Support**: Built-in resolution for Tailwind CSS 4 utility classes and external CSS variables. Resolves color contrast statically without a browser.
+
+### ⚡ Developer Experience
+- **Interactive TUI 2.0**: A beautiful terminal dashboard with platform badges, real-time project statistics, and detailed violation summaries.
+- **Universal MCP Support**: One-command integration with AI agents (**Claude, Cursor, VS Code, Gemini, Qwen, OpenCode**) via the Model Context Protocol.
+- **CI/CD Ready**: Built-in `init` command to scaffold GitHub Actions, pre-commit hooks, and configurations.
+- **Zero Hallucinations**: 100% deterministic logic. If A11ySentry flags it, it's a real violation.
 
 ---
 
 ## 📦 Installation
 
 ### Quick Install (Automatic)
-Run the smart installer to download the binary, add it to your PATH, and register MCP in all your AI agents:
+Run the smart installer to download the latest binary and add it to your PATH:
 
 **Windows (PowerShell):**
 ```powershell
@@ -49,110 +52,49 @@ curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh |
 
 ## 🖥️ Usage
 
-### CLI & TUI
+### CLI Commands
 ```bash
-# Initialize a project (scaffolds CI/CD, hooks, config)
+# Initialize CI/CD and config
 a11ysentry init
 
-# Analyze a file directly
-a11ysentry path/to/file.html
+# Analyze a single file
+a11ysentry MyComponent.tsx
 
-# Analyze full project (resolves component trees)
-a11ysentry .
+# Analyze a full project directory (Framework-aware)
+a11ysentry --dir ./src
 
-# Output formats
-a11ysentry --format sarif . > results.sarif   # GitHub Code Scanning
-a11ysentry --format json .                    # Machine-readable JSON
-a11ysentry --format text .                    # Human-readable (default)
+# Watch mode for real-time feedback
+a11ysentry --watch .
 
-# Pre-load CSS for accurate color contrast
-a11ysentry --css global.css,branding.css Component.vue
-
-# Watch mode — re-analyze on file changes
-a11ysentry --watch Component.tsx
-
-# Open the interactive TUI dashboard
+# Open the TUI Dashboard
 a11ysentry --tui
 ```
 
-### AI Agents & MCP
-A11ySentry integrates with your favorite AI agents via the **Model Context Protocol**.
-
+### AI Agent Integration (MCP)
 ```bash
-# Register in all detected agents (Claude, Cursor, Gemini, etc.)
+# Register A11ySentry in all your AI tools at once
 a11ysentry mcp --register
-
-# Verify registration status
-a11ysentry mcp --check-mcp
-
-# Start the MCP server manually (Stdio)
-a11ysentry mcp
 ```
 
 ---
 
 ## 📂 Project Structure
 
-```
-semantix/
-├── engine/              # Core WCAG rules and SQLite persistence
-├── adapters/            # Platform-specific ingestion (15+ platforms)
-├── cli/                 # Unified entry point and TUI (Bubbletea)
-├── mcp/                 # MCP registration and server logic
-├── examples/            # Multi-platform components for testing
-├── docs/                # Comprehensive documentation
-└── openspec/            # Spec-driven development specs
-```
+- `engine/`: Core WCAG rules, USN schema, and SQLite history persistence.
+- `adapters/`: Platform-specific parsers (Web, Android, iOS, Flutter, RN, etc.).
+- `scanner/`: Framework detection and dependency graph resolution.
+- `cmd/a11ysentry/`: Main entry point and TUI (Charmbracelet Bubbletea).
+- `mcp/`: Model Context Protocol server and registration logic.
+- `examples/`: Complex multi-platform test cases.
 
-## 📚 Documentation
-
-- **[API Reference](./docs/API_REFERENCE.md)** - Core types, interfaces, and CLI commands
-- **[Architecture Deep Dive](./docs/ARCHITECTURE_DEEP_DIVE.md)** - Pipeline stages, data flow, design decisions
-- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - How to create adapters, add rules, and test
-- **[MCP Integration Guide](./docs/MCP_INTEGRATION.md)** - AI agent setup and tool usage
-- **[Examples Documentation](./examples/README.md)** - Platform-specific examples and patterns
-- **[Release Guide](./docs/RELEASE.md)** - Build, deploy, and maintenance procedures
+---
 
 ## 🤝 Contributing
+We are building the future of inclusive software. Check our **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** to learn how to add new adapters or rules.
 
-We love contributors! See our contribution resources:
+- **[Architecture Deep Dive](./docs/ARCHITECTURE_DEEP_DIVE.md)**
+- **[API Reference](./docs/API_REFERENCE.md)**
+- **[MCP Integration Guide](./docs/MCP_INTEGRATION.md)**
 
-- **[Contributing Guidelines](./CONTRIBUTING.md)** - Commits, branches, and PR process
-- **[Code of Conduct](./CODE_OF_CONDUCT.md)** - Community standards
-- **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Technical implementation guide
-- **[Examples](./examples/README.md)** - Add platform examples
-
-### Quick Start for Contributors
-
-```bash
-# Clone the repository
-git clone https://github.com/mbiondo/a11ysentry.git
-cd semantix
-
-# Build CLI
-cd cli && go build -o a11ysentry
-
-# Run tests
-go test ./...
-
-# Analyze an example file
-./a11ysentry ../examples/example-astro/src/pages/index.astro
-```
-
-## 📄 License & Security
-
-- **License:** [MIT License](./LICENSE)
-- **Security Policy:** [SECURITY.md](./SECURITY.md)
-- **Changelog:** [CHANGELOG.md](./CHANGELOG.md)
-
-## 🚀 Quick Links
-
-| I want to... | Go to... |
-|--------------|----------|
-| Install A11ySentry | [Installation Section](#-installation) |
-| Understand the architecture | [Architecture Deep Dive](./docs/ARCHITECTURE_DEEP_DIVE.md) |
-| Add a new platform adapter | [Developer Guide - Creating Adapters](./docs/DEVELOPER_GUIDE.md#creating-a-new-adapter) |
-| Integrate with AI agents | [MCP Integration Guide](./docs/MCP_INTEGRATION.md) |
-| See examples | [Examples Documentation](./examples/README.md) |
-| Report a bug | [GitHub Issues](https://github.com/mbiondo/a11ysentry/issues) |
-| Release a new version | [Release Guide](./docs/RELEASE.md) |
+## 📄 License
+Licensed under the [MIT License](./LICENSE).

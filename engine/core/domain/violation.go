@@ -72,8 +72,20 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 	hasH1 := false
 	hasLang := false
 
-	// Pass 1: Collect metadata (Labels for inputs, doc info, landmarks)
-	for _, node := range nodes {
+	// Maps for structural link analysis (WCAG 2.4.4)
+	linksByLabel := make(map[string]map[string][]int) // label -> href -> indices
+
+	// Pass 1: Collect metadata (Labels for inputs, doc info, landmarks, links)
+	for i, node := range nodes {
+		// Structural link analysis
+		if node.Role == RoleLink && node.Label != "" {
+			href, _ := node.Traits["href"].(string)
+			if _, ok := linksByLabel[node.Label]; !ok {
+				linksByLabel[node.Label] = make(map[string][]int)
+			}
+			linksByLabel[node.Label][href] = append(linksByLabel[node.Label][href], i)
+		}
+
 		// Identify Web document-level traits
 		if node.UID == "html" || node.UID == "html-tag" {
 			if lang, ok := node.Traits["lang"].(string); ok && lang != "" {
@@ -97,6 +109,36 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 		// Initialize landmark tracking maps
 		if _, exists := landmarkLabels[node.Role]; !exists && isLandmark(node.Role) {
 			landmarkLabels[node.Role] = make(map[string]Source)
+		}
+	}
+
+	// Structural Rule: WCAG 2.4.4 - Link Purpose (Structural approach)
+	// If multiple links have the same text but different hrefs, they must have unique ARIA labels.
+	for label, hrefs := range linksByLabel {
+		if len(hrefs) > 1 {
+			// Check if any node in these sets has unique accessible names.
+			// (Simplified: if we have multiple hrefs for same text, flag all).
+			for _, indices := range hrefs {
+				for _, idx := range indices {
+					node := nodes[idx]
+					// If they have aria-label or aria-labelledby, assume they are distinguished.
+					if _, hasALabel := node.Traits["aria-label"].(string); hasALabel {
+						continue
+					}
+					if _, hasALabelled := node.Traits["aria-labelledby"].(string); hasALabelled {
+						continue
+					}
+
+					add(Violation{
+						ErrorCode:        "WCAG_2_4_4",
+						Severity:         SeverityError,
+						Message:          fmt.Sprintf("Multiple links have the same label '%s' but point to different destinations. This is ambiguous for screen reader users.", label),
+						SourceRef:        node.Source,
+						FixSnippet:       fmt.Sprintf("Add aria-label=\"%s - [Context]\" to distinguish this link.", label),
+						DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/general/G91",
+					})
+				}
+			}
 		}
 	}
 
@@ -411,6 +453,57 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 					SourceRef:        node.Source,
 					FixSnippet:       "Add a keydown handler and tabindex=\"0\", or change the element to a native <button>.",
 					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/general/G90",
+				})
+			}
+		}
+
+		// Rule 17: Autocomplete for common inputs (WCAG 1.3.5)
+		if node.Role == RoleInput {
+			inputType, _ := node.Traits["type"].(string)
+			autocomplete, _ := node.Traits["autocomplete"].(string)
+
+			tokens := map[string]string{
+				"email": "email",
+				"tel":   "tel",
+				"url":   "url",
+			}
+
+			if expected, ok := tokens[inputType]; ok && autocomplete == "" {
+				add(Violation{
+					ErrorCode:        "WCAG_1_3_5",
+					Severity:         SeverityWarning,
+					Message:          fmt.Sprintf("Input of type '%s' is missing an autocomplete attribute. Providing it helps users with cognitive disabilities.", inputType),
+					SourceRef:        node.Source,
+					FixSnippet:       fmt.Sprintf("autocomplete=\"%s\"", expected),
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/html/H98",
+				})
+			}
+		}
+
+		// Rule 18: Focusable elements in aria-hidden areas (WCAG 2.4.3)
+		if isNativeInteractive || hasTabIndex {
+			if _, inheritedHidden := node.Traits["aria-hidden-inherited"]; inheritedHidden {
+				add(Violation{
+					ErrorCode:        "WCAG_2_4_3_HIDDEN",
+					Severity:         SeverityError,
+					Message:          "Interactive element is inside an 'aria-hidden=\"true\"' container. Keyboard users can reach it, but screen reader users will ignore it.",
+					SourceRef:        node.Source,
+					FixSnippet:       "Remove 'aria-hidden=\"true\"' from the parent or remove the element from the tab order using tabindex=\"-1\".",
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA14",
+				})
+			}
+		}
+
+		// Rule 19: Redundant Title (Best Practice)
+		if title, ok := node.Traits["title"].(string); ok && title != "" {
+			if strings.TrimSpace(title) == strings.TrimSpace(node.Label) {
+				add(Violation{
+					ErrorCode:        "REDUNDANT_TITLE",
+					Severity:         SeverityWarning,
+					Message:          "The 'title' attribute is identical to the element's text/label. This creates redundant announcements for screen reader users.",
+					SourceRef:        node.Source,
+					FixSnippet:       "Remove the title attribute as it provides no additional information.",
+					DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/html/H65",
 				})
 			}
 		}

@@ -68,19 +68,20 @@ func (f *Framework) BuildPageTrees(
 	importGraph map[string][]string,
 	projectRoot string,
 ) []scanner.PageTree {
-	if len(allFiles) == 0 {
-		return nil
+	var trees []scanner.PageTree
+	for _, file := range allFiles {
+		trees = append(trees, scanner.PageTree{
+			Label: shortPath(file, projectRoot),
+			Root:  &domain.FileNode{FilePath: file},
+		})
 	}
+	return trees
+}
 
-	root := &domain.FileNode{FilePath: projectRoot}
-	for _, f := range allFiles {
-		root.Children = append(root.Children, &domain.FileNode{FilePath: f})
+func shortPath(abs, base string) string {
+	rel, err := filepath.Rel(base, abs)
+	if err != nil {
+		return abs
 	}
-
-	return []scanner.PageTree{
-		{
-			Label: "iOS App",
-			Root:  root,
-		},
-	}
+	return rel
 }

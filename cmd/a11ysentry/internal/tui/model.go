@@ -53,12 +53,26 @@ func NewMainModel(repo ports.Repository) MainModel {
 }
 
 type projectItem struct {
-	name  string
-	count int
+	name     string
+	count    int
+	errors   int
+	warnings int
 }
 
 func (i projectItem) Title() string       { return i.name }
-func (i projectItem) Description() string { return fmt.Sprintf("%d analysis reports", i.count) }
+func (i projectItem) Description() string {
+	res := fmt.Sprintf("%d files", i.count)
+	if i.errors > 0 {
+		res += fmt.Sprintf(" • 🔴 %d", i.errors)
+	}
+	if i.warnings > 0 {
+		res += fmt.Sprintf(" • 🟠 %d", i.warnings)
+	}
+	if i.errors == 0 && i.warnings == 0 {
+		res += " • ✅ Clean"
+	}
+	return res
+}
 func (i projectItem) FilterValue() string { return i.name }
 
 type reportItem struct {
@@ -69,7 +83,30 @@ func (i reportItem) Title() string {
 	return filepath.Base(i.report.FilePath)
 }
 func (i reportItem) Description() string {
-	return fmt.Sprintf("%s - %s", i.report.Platform, time.Unix(i.report.Timestamp, 0).Format("2006-01-02 15:04"))
+	ts := time.Unix(i.report.Timestamp, 0).Format("2006-01-02 15:04")
+	badge := getPlatformBadge(string(i.report.Platform))
+	
+	errors, warnings := 0, 0
+	for _, v := range i.report.Violations {
+		if v.Severity == "error" {
+			errors++
+		} else {
+			warnings++
+		}
+	}
+	
+	stats := ""
+	if errors > 0 {
+		stats += fmt.Sprintf(" • %d 🔴", errors)
+	}
+	if warnings > 0 {
+		stats += fmt.Sprintf(" • %d 🟠", warnings)
+	}
+	if errors == 0 && warnings == 0 {
+		stats += " • ✅"
+	}
+
+	return fmt.Sprintf("%s %s%s", badge, ts, stats)
 }
 func (i reportItem) FilterValue() string { return i.report.FilePath }
 
@@ -153,7 +190,12 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *MainModel) updateProjectsList() {
-	projectCounts := make(map[string]int)
+	type stats struct {
+		count    int
+		errors   int
+		warnings int
+	}
+	projectStats := make(map[string]stats)
 	var projectNames []string
 
 	for _, r := range m.allReports {
@@ -161,15 +203,32 @@ func (m *MainModel) updateProjectsList() {
 		if name == "" {
 			name = "Unknown Project"
 		}
-		if _, exists := projectCounts[name]; !exists {
+		
+		s := projectStats[name]
+		if s.count == 0 {
 			projectNames = append(projectNames, name)
 		}
-		projectCounts[name]++
+		s.count++
+		for _, v := range r.Violations {
+			switch v.Severity {
+			case "error":
+				s.errors++
+			case "warning":
+				s.warnings++
+			}
+		}
+		projectStats[name] = s
 	}
 
 	var items []list.Item
 	for _, name := range projectNames {
-		items = append(items, projectItem{name: name, count: projectCounts[name]})
+		s := projectStats[name]
+		items = append(items, projectItem{
+			name:     name,
+			count:    s.count,
+			errors:   s.errors,
+			warnings: s.warnings,
+		})
 	}
 	m.projectsList.SetItems(items)
 	m.projectsList.Title = "Projects"

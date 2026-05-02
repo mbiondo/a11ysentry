@@ -16,7 +16,34 @@ var (
 			Padding(0, 2)
 
 	docStyle = lipgloss.NewStyle().Margin(1, 2)
+
+	// Platform Badges
+	badgeStyle = lipgloss.NewStyle().
+			Bold(true).
+			Padding(0, 1).
+			Foreground(lipgloss.Color("#FFFFFF"))
+
+	badgeWeb = badgeStyle.Background(lipgloss.Color("#61DAFB")).SetString(" WEB ")
+	badgeAndroid = badgeStyle.Background(lipgloss.Color("#3DDC84")).SetString(" ANDROID ")
+	badgeIOS     = badgeStyle.Background(lipgloss.Color("#A2AAAD")).SetString(" iOS ")
+	badgeFlutter = badgeStyle.Background(lipgloss.Color("#02569B")).SetString(" FLUTTER ")
+	badgeRN      = badgeStyle.Background(lipgloss.Color("#61DAFB")).SetString(" RN ")
 )
+
+func getPlatformBadge(p string) string {
+	switch p {
+	case "ANDROID_COMPOSE", "ANDROID_VIEW":
+		return badgeAndroid.Render()
+	case "IOS_SWIFTUI":
+		return badgeIOS.Render()
+	case "FLUTTER_DART":
+		return badgeFlutter.Render()
+	case "REACT_NATIVE":
+		return badgeRN.Render()
+	default:
+		return badgeWeb.Render()
+	}
+}
 
 func (m MainModel) projectsView() string {
 	header := headerStyle.Render("🛡️  A11ySentry Dashboard")

@@ -127,6 +127,35 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 			},
 			wantCodes: []string{},
 		},
+		{
+			name: "Ambiguous Link Purpose",
+			nodes: []USN{
+				{Role: RoleLink, Label: "Read more", Traits: map[string]any{"href": "/a"}, Source: Source{Platform: PlatformWebReact, Line: 1, RawHTML: "<a href='/a'>Read more</a>"}},
+				{Role: RoleLink, Label: "Read more", Traits: map[string]any{"href": "/b"}, Source: Source{Platform: PlatformWebReact, Line: 2, RawHTML: "<a href='/b'>Read more</a>"}},
+			},
+			wantCodes: []string{"WCAG_2_4_4", "WCAG_2_4_4", "WCAG_3_1_1", "G141"},
+		},
+		{
+			name: "Missing Autocomplete",
+			nodes: []USN{
+				{Role: RoleInput, Traits: map[string]any{"type": "email"}, Source: Source{Platform: PlatformWebReact, Line: 1, RawHTML: "<input type='email'>"}},
+			},
+			wantCodes: []string{"WCAG_3_3_2", "WCAG_1_3_5", "WCAG_3_1_1", "G141"},
+		},
+		{
+			name: "Focusable in Hidden Area",
+			nodes: []USN{
+				{Role: RoleButton, Label: "Submit", Traits: map[string]any{"aria-hidden-inherited": true}, Source: Source{Platform: PlatformWebReact, Line: 1, RawHTML: "<button>Submit</button>"}},
+			},
+			wantCodes: []string{"WCAG_2_4_3_HIDDEN", "WCAG_3_1_1", "G141"},
+		},
+		{
+			name: "Redundant Title",
+			nodes: []USN{
+				{Role: RoleLink, Label: "Home", Traits: map[string]any{"title": "Home"}, Source: Source{Platform: PlatformWebReact, Line: 1, RawHTML: "<a title='Home'>Home</a>"}},
+			},
+			wantCodes: []string{"REDUNDANT_TITLE", "WCAG_3_1_1", "G141"},
+		},
 	}
 
 	cfg := DefaultConfig()

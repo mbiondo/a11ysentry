@@ -57,10 +57,10 @@ func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]doma
 		return nil, nil
 	}
 	// Initial ingestion starts with no inherited context.
-	return a.ingestRecursive(ctx, root, "", "")
+	return a.ingestRecursive(ctx, root, "", "", false)
 }
 
-func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string) ([]domain.USN, error) {
+func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string, inheritedHidden bool) ([]domain.USN, error) {
 	data, err := os.ReadFile(node.FilePath)
 	if err != nil {
 		return nil, err
@@ -96,18 +96,22 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 	a.extractCSS(doc)
 
 	// Pass 2: Traverse this file with inherited context from parent file
-	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG)
+	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG, inheritedHidden)
 
 	// Determine the effective background and foreground to propagate to children files.
 	// We look for the most specific colors defined in the current file.
 	childBG := inheritedBG
 	childFG := inheritedFG
+	childHidden := inheritedHidden
 	for _, n := range nodes {
 		if bg, ok := n.Traits["background-color"].(string); ok && bg != "" {
 			childBG = bg
 		}
 		if fg, ok := n.Traits["color"].(string); ok && fg != "" {
 			childFG = fg
+		}
+		if h, ok := n.Traits["aria-hidden"].(string); ok && h == "true" {
+			childHidden = true
 		}
 	}
 
@@ -116,7 +120,7 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 
 	// Recursively ingest children (imported components or nested layouts)
 	for _, child := range node.Children {
-		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG)
+		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG, childHidden)
 		if err != nil {
 			return nil, err
 		}
@@ -170,7 +174,7 @@ func (a *htmlAdapter) parseCSSInto(css string, target map[string]map[string]stri
 	}
 }
 
-func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fullContent string, isComponent bool, inheritedBG string, inheritedFG string) []domain.USN {
+func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fullContent string, isComponent bool, inheritedBG string, inheritedFG string, inheritedHidden bool) []domain.USN {
 	var nodes []domain.USN
 
 	if n.Type == html.ElementNode {
@@ -190,6 +194,10 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				RawHTML:     raw,
 				IsComponent: isComponent,
 			},
+		}
+
+		if inheritedHidden {
+			usn.Traits["aria-hidden-inherited"] = true
 		}
 
 		// 0. Override Role if explicit ARIA role is present
@@ -243,7 +251,7 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		for _, attr := range n.Attr {
 			if attr.Key == "id" || attr.Key == "lang" || attr.Key == "type" || attr.Key == "class" || attr.Key == "className" || attr.Key == "for" ||
 				attr.Key == "aria-pressed" || attr.Key == "aria-expanded" || attr.Key == "aria-checked" || attr.Key == "role" ||
-				attr.Key == "tabindex" || attr.Key == "aria-live" ||
+				attr.Key == "tabindex" || attr.Key == "aria-live" || attr.Key == "href" || attr.Key == "title" || attr.Key == "autocomplete" || attr.Key == "aria-hidden" ||
 				attr.Key == "onclick" || attr.Key == "onkeydown" || attr.Key == "onkeyup" || attr.Key == "onkeypress" ||
 				attr.Key == "@click" || attr.Key == "v-on:click" || attr.Key == "(click)" || attr.Key == "on:click" ||
 				attr.Key == "@keydown" || attr.Key == "v-on:keydown" || attr.Key == "(keydown)" || attr.Key == "on:keydown" ||
@@ -374,6 +382,7 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 	// Determine the background-color and color to propagate to children.
 	childBG := inheritedBG
 	childFG := inheritedFG
+	childHidden := inheritedHidden
 	if n.Type == html.ElementNode && len(nodes) > 0 {
 		last := nodes[len(nodes)-1]
 		if bg, ok := last.Traits["background-color"].(string); ok && bg != "" {
@@ -382,10 +391,13 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		if fg, ok := last.Traits["color"].(string); ok && fg != "" {
 			childFG = fg
 		}
+		if h, ok := last.Traits["aria-hidden"].(string); ok && h == "true" {
+			childHidden = true
+		}
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		nodes = append(nodes, a.traverse(c, filename, lines, fullContent, isComponent, childBG, childFG)...)
+		nodes = append(nodes, a.traverse(c, filename, lines, fullContent, isComponent, childBG, childFG, childHidden)...)
 	}
 
 	return nodes

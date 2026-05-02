@@ -702,10 +702,12 @@ usn := domain.USN{
 - [MCP Integration Guide](./MCP_INTEGRATION.md)
 
 ## Examples actuales
-- example-astro: proyecto de ejemplo con Astro (archivo de configuración, layout y páginas de muestra en src/…)
-- example-nextjs: Next.js App Router de ejemplo con app/layout.tsx, app/page.tsx, y componentes de ejemplo
-- example-nuxt: Nuxt 3 de ejemplo con nuxt.config.ts, layouts/default.vue y pages
-- example-sveltekit: SvelteKit de ejemplo con +layout.svelte, +page.svelte y rutas de ejemplo
+- example-astro: proyecto de ejemplo con Astro.
+- example-nextjs: Next.js App Router de ejemplo.
+- example-flutter-complex: Complejo proyecto en Dart con Semantics y widgets anidados.
+- example-react-native-complex: Proyecto TSX con Pressable, accessibilityLabel y hidden traits.
+- example-android-complex: Compose con jerarquías profundas y ContentDescription.
+- example-ios-complex: SwiftUI con modifiers avanzados y combinación de elementos.
 
 - Se eliminó el directorio examples/web y toda su contenido asociado. Las referencias a ese conjunto ya no forman parte de la guía ni de la ejecución de desarrollo.
 

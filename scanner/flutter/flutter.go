@@ -1,4 +1,4 @@
-package android
+package flutter
 
 import (
 	"a11ysentry/engine/core/domain"
@@ -8,19 +8,16 @@ import (
 	"strings"
 )
 
-// Framework implements scanner.ProjectFramework for Android projects.
+// Framework implements scanner.ProjectFramework for Flutter projects.
 type Framework struct{}
 
 func New() *Framework { return &Framework{} }
 
-func (f *Framework) Name() string { return "Android (Kotlin/Java)" }
+func (f *Framework) Name() string { return "Flutter (Dart)" }
 
-// Probe returns true when dir contains an Android project.
+// Probe returns true when dir contains a Flutter project.
 func (f *Framework) Probe(dir string) bool {
-	return scanner.FileExists(filepath.Join(dir, "build.gradle")) ||
-		scanner.FileExists(filepath.Join(dir, "build.gradle.kts")) ||
-		scanner.FileExists(filepath.Join(dir, "settings.gradle")) ||
-		scanner.FileExists(filepath.Join(dir, "settings.gradle.kts"))
+	return scanner.FileExists(filepath.Join(dir, "pubspec.yaml"))
 }
 
 // CollectFiles walks dir and returns UI component files.
@@ -39,11 +36,9 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if scanner.UIExtensions[ext] {
+		if ext == ".dart" {
 			uiFiles = append(uiFiles, path)
 		}
-		// Android doesn't typically use CSS, but we might have color XMLs.
-		// For now, we focus on UI files.
 		return nil
 	})
 	return uiFiles, cssFiles, err

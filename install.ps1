@@ -6,7 +6,7 @@ $Owner = "mbiondo"
 $Repo = "a11ysentry"
 $BinaryName = "a11ysentry.exe"
 
-Write-Host "🛡️  A11ySentry: Starting smart installation for Windows..." -ForegroundColor Cyan
+Write-Host "A11ySentry: Starting smart installation for Windows..." -ForegroundColor Cyan
 
 # 1. Detect Arch
 $Arch = "amd64"
@@ -29,9 +29,9 @@ if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
 
 if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
     Copy-Item $LocalBinary -Destination $BinaryFull -Force
-    Write-Host "🚧 DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
+    Write-Host "DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
 } else {
-    Write-Host "📥 Downloading latest release from GitHub..." -ForegroundColor Cyan
+    Write-Host "Downloading latest release from GitHub..." -ForegroundColor Cyan
     $LatestReleaseUrl = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
     try {
         $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -UseBasicParsing
@@ -53,7 +53,6 @@ if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
         if (Test-Path $ExtractedBinary) {
             Move-Item $ExtractedBinary -Destination $BinaryFull -Force
         } else {
-            # GoReleaser might nest it or use a different folder structure in the zip
             $Files = Get-ChildItem -Path $env:TEMP -Filter $BinaryName -Recurse
             if ($Files.Count -gt 0) {
                 Move-Item $Files[0].FullName -Destination $BinaryFull -Force
@@ -63,9 +62,9 @@ if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
         }
         
         Remove-Item $TempZip -ErrorAction SilentlyContinue
-        Write-Host "✅ Successfully installed A11ySentry $Tag." -ForegroundColor Green
+        Write-Host "Successfully installed A11ySentry $Tag." -ForegroundColor Green
     } catch {
-        Write-Error "❌ Failed to download or install A11ySentry: $_"
+        Write-Error "Failed to download or install A11ySentry: $_"
         return
     }
 }
@@ -76,11 +75,11 @@ if ($UserPath -notlike "*$InstallDir*") {
     $NewPath = "$UserPath;$InstallDir"
     [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
     $env:Path += ";$InstallDir"
-    Write-Host "✅ Added to User PATH." -ForegroundColor Green
+    Write-Host "Added to User PATH." -ForegroundColor Green
 }
 
 # 5. MCP Registration & Skill Setup
-Write-Host "⚙️  Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
+Write-Host "Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
 $BinaryFull = Join-Path $InstallDir $BinaryName
 if (Test-Path $BinaryFull) {
     # Call the binary with the mcp subcommand
@@ -98,11 +97,11 @@ if (Test-Path $BinaryFull) {
             New-Item -ItemType Directory -Path $AgentSkillsDir -Force | Out-Null
         }
         Copy-Item -Path "$SkillSource\*" -Destination $AgentSkillsDir -Recurse -Force
-        Write-Host "🧠 Registered a11ysentry-mcp skill in Agent Teams." -ForegroundColor Green
+        Write-Host "Registered a11ysentry-mcp skill in Agent Teams." -ForegroundColor Green
     }
 } else {
-    Write-Warning "⚠️  Automatic MCP registration skipped (binary not found at $BinaryFull)."
+    Write-Warning "Automatic MCP registration skipped (binary not found at $BinaryFull)."
 }
 
-Write-Host "✅ A11ySentry installed successfully!" -ForegroundColor Green
-Write-Host "🚀 Restart your terminal and try running 'a11ysentry --tui'."
+Write-Host "A11ySentry installed successfully!" -ForegroundColor Green
+Write-Host "Restart your terminal and try running 'a11ysentry --tui'."

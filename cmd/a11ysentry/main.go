@@ -21,10 +21,12 @@ import (
 	"a11ysentry/scanner"
 	androidfw "a11ysentry/scanner/android"
 	astrofw "a11ysentry/scanner/astro"
+	flutterfw "a11ysentry/scanner/flutter"
 	"a11ysentry/scanner/generic"
 	iosfw "a11ysentry/scanner/ios"
 	"a11ysentry/scanner/nextjs"
 	"a11ysentry/scanner/nuxt"
+	rnfw "a11ysentry/scanner/reactnative"
 	sveltekit "a11ysentry/scanner/sveltekit"
 
 	"context"
@@ -46,7 +48,7 @@ import (
 )
 
 var (
-	Version    = "0.0.2"
+	Version    = "0.0.3"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 
@@ -237,6 +239,8 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		sveltekit.New(),
 		androidfw.New(),
 		iosfw.New(),
+		flutterfw.New(),
+		rnfw.New(),
 		generic.New(),
 	)
 
@@ -288,12 +292,19 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			case "iOS (Swift/SwiftUI)":
 				adapter = ios.NewIOSAdapter()
 				platform = domain.PlatformIOSSwiftUI
+			case "Flutter (Dart)":
+				adapter = flutter.NewFlutterAdapter()
+				platform = domain.PlatformFlutterDart
+			case "React Native (TSX/JSX)":
+				adapter = reactnative.NewReactNativeAdapter()
+				platform = domain.PlatformReactNative
 			default:
 				adapter = web.NewHTMLAdapter()
 			}
 
 			// Pre-load CSS from the whole tree for web frameworks.
-			if fw.Name() != "Android (Kotlin/Java)" && fw.Name() != "iOS (Swift/SwiftUI)" {
+			if fw.Name() != "Android (Kotlin/Java)" && fw.Name() != "iOS (Swift/SwiftUI)" &&
+				fw.Name() != "Flutter (Dart)" && fw.Name() != "React Native (TSX/JSX)" {
 				allFiles := tree.Root.Flatten()
 				web.LoadProjectCSS(adapter, append(cssFiles, allFiles...))
 			}
@@ -301,12 +312,14 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			// Ingest the entire tree as a single analysis unit.
 			usns, err := adapter.Ingest(context.Background(), tree.Root)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error ingesting tree %s: %v\n", tree.Label, err)
 				return
 			}
 
 			analyzer := domain.NewAnalyzer()
 			violations, err := analyzer.Analyze(context.Background(), usns, cfg)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error analyzing tree %s: %v\n", tree.Label, err)
 				return
 			}
 
