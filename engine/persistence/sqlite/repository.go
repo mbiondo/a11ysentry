@@ -33,9 +33,12 @@ func NewSQLiteRepository(dbPath string) (ports.Repository, error) {
 }
 
 func (r *sqliteRepository) migrate() error {
+	// First ensure the table exists
 	query := `
 	CREATE TABLE IF NOT EXISTS analysis_reports (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		project_name TEXT,
+		project_root TEXT,
 		file_path TEXT NOT NULL,
 		platform TEXT NOT NULL,
 		timestamp INTEGER NOT NULL,
@@ -43,8 +46,19 @@ func (r *sqliteRepository) migrate() error {
 	);
 	CREATE INDEX IF NOT EXISTS idx_reports_timestamp ON analysis_reports(timestamp);
 	`
-	_, err := r.db.Exec(query)
-	return err
+	if _, err := r.db.Exec(query); err != nil {
+		return err
+	}
+
+	// Simple check-and-add for migration (SQLite doesn't support IF NOT EXISTS for columns)
+	columns := []string{"project_name", "project_root"}
+	for _, col := range columns {
+		_, err := r.db.Exec(fmt.Sprintf("ALTER TABLE analysis_reports ADD COLUMN %s TEXT", col))
+		// Ignore error if column already exists
+		_ = err
+	}
+
+	return nil
 }
 
 func (r *sqliteRepository) SaveReport(ctx context.Context, report domain.ViolationReport) error {
@@ -58,15 +72,15 @@ func (r *sqliteRepository) SaveReport(ctx context.Context, report domain.Violati
 	}
 
 	_, err = r.db.ExecContext(ctx,
-		"INSERT INTO analysis_reports (file_path, platform, timestamp, violations_json) VALUES (?, ?, ?, ?)",
-		report.FilePath, report.Platform, report.Timestamp, string(violationsJSON),
+		"INSERT INTO analysis_reports (project_name, project_root, file_path, platform, timestamp, violations_json) VALUES (?, ?, ?, ?, ?, ?)",
+		report.ProjectName, report.ProjectRoot, report.FilePath, report.Platform, report.Timestamp, string(violationsJSON),
 	)
 	return err
 }
 
 func (r *sqliteRepository) GetHistory(ctx context.Context, limit int) ([]domain.ViolationReport, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, file_path, platform, timestamp, violations_json FROM analysis_reports ORDER BY timestamp DESC LIMIT ?",
+		"SELECT id, project_name, project_root, file_path, platform, timestamp, violations_json FROM analysis_reports ORDER BY timestamp DESC LIMIT ?",
 		limit,
 	)
 	if err != nil {
@@ -78,9 +92,13 @@ func (r *sqliteRepository) GetHistory(ctx context.Context, limit int) ([]domain.
 	for rows.Next() {
 		var rep domain.ViolationReport
 		var violationsJSON string
-		if err := rows.Scan(&rep.ID, &rep.FilePath, &rep.Platform, &rep.Timestamp, &violationsJSON); err != nil {
+		var projectName, projectRoot sql.NullString
+		if err := rows.Scan(&rep.ID, &projectName, &projectRoot, &rep.FilePath, &rep.Platform, &rep.Timestamp, &violationsJSON); err != nil {
 			return nil, err
 		}
+
+		rep.ProjectName = projectName.String
+		rep.ProjectRoot = projectRoot.String
 
 		if err := json.Unmarshal([]byte(violationsJSON), &rep.Violations); err != nil {
 			return nil, err

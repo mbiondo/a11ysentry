@@ -131,53 +131,81 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 	}
 
 	if len(allViolations) == 0 {
-		return mcp.NewToolResultText(fmt.Sprintf("✅ No accessibility violations found in directory %s.", dir)), nil
+		return mcp.NewToolResultText("✅ No violations found."), nil
 	}
 
-	toonReport := domain.ToTOON(allViolations)
-	return mcp.NewToolResultText(fmt.Sprintf("❌ Found %d accessibility violations in directory %s (TOON Format):\n\n%s", len(allViolations), dir, toonReport)), nil
+	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
 }
 
 func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*mcp.CallToolResult, error) {
-	var allNodes []domain.USN
+	var allViolations []domain.Violation
+	analyzer := domain.NewAnalyzer()
 
 	for _, p := range paths {
 		p = strings.TrimSpace(p)
-		adapter, _ := getAdapterAndPlatform(p, "")
-		if adapter == nil {
-			log.Printf("Skipping unsupported file: %s", p)
+		absPath, err := filepath.Abs(p)
+		if err != nil {
+			log.Printf("Could not resolve absolute path for %s: %v", p, err)
 			continue
 		}
 
-		// 2. Ingest Source
-		rootNode := &domain.FileNode{FilePath: p}
+		// 1. Detect framework to use its collection/tree building logic
+		dir := filepath.Dir(absPath)
+		fw := scanner.Detect(dir,
+			nextjs.New(),
+			astrofw.New(),
+			nuxt.New(),
+			sveltekit.New(),
+			androidfw.New(),
+			iosfw.New(),
+			generic.New(),
+		)
+
+		// 2. Build a localized tree for this specific file
+		// We treat the single file as a potential root and let the scanner find its children.
+		uiFiles := []string{absPath}
+		importGraph := scanner.BuildImportGraph(uiFiles, fw, dir)
+		
+		// We manually create a root node and try to resolve its children if it's a supported framework
+		rootNode := &domain.FileNode{FilePath: absPath}
+		
+		// If the framework supports building trees, we try to "expand" this file's context
+		// Note: This is a simplified version of project-aware analysis but focused on a single entry point.
+		adapter, _ := getAdapterAndPlatform(absPath, fw.Name())
+		if adapter == nil {
+			log.Printf("Skipping unsupported file: %s", absPath)
+			continue
+		}
+
+		// Try to populate children via the import graph
+		if deps, ok := importGraph[absPath]; ok {
+			for _, dep := range deps {
+				childNode := &domain.FileNode{FilePath: dep}
+				rootNode.Children = append(rootNode.Children, childNode)
+				// Note: For deep trees, we could recursively expand here, but BuildImportGraph 
+				// is usually called on a full set. Since we only passed [absPath], we get direct children.
+			}
+		}
+
+		// 3. Load project config if nearby
+		cfg, _ := domain.LoadConfig(filepath.Join(dir, "a11ysentry.json"))
+
+		// 4. Ingest the tree (adapter handles the recursion if we provided children)
 		nodes, err := adapter.Ingest(ctx, rootNode)
 		if err != nil {
-			return mcp.NewToolResultError(fmt.Sprintf("Error reading file %s: %v", p, err)), nil
+			log.Printf("Error ingesting file %s: %v", p, err)
+			continue
 		}
-		allNodes = append(allNodes, nodes...)
+
+		violations, _ := analyzer.Analyze(ctx, nodes, cfg)
+		allViolations = append(allViolations, violations...)
 	}
 
-	if len(allNodes) == 0 {
-		return mcp.NewToolResultError("No valid source files provided for analysis."), nil
+	if len(allViolations) == 0 {
+		return mcp.NewToolResultText("✅ No violations found."), nil
 	}
 
-	analyzer := domain.NewAnalyzer()
-	cfg, _ := domain.LoadConfig("a11ysentry.json")
-
-	// 3. Perform Analysis on the combined tree
-	violations, err := analyzer.Analyze(ctx, allNodes, cfg)
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("Analysis failed: %v", err)), nil
-	}
-
-	// 4. Format Result (Optimized with TOON)
-	if len(violations) == 0 {
-		return mcp.NewToolResultText(fmt.Sprintf("✅ No accessibility violations found in %s.", originalInput)), nil
-	}
-
-	toonReport := domain.ToTOON(violations)
-	return mcp.NewToolResultText(fmt.Sprintf("❌ Found %d accessibility violations in %s (TOON Format):\n\n%s", len(violations), originalInput, toonReport)), nil
+	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
 }
 
 func getAdapterAndPlatform(filePath, fwName string) (ports.Adapter, domain.Platform) {

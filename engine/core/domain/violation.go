@@ -27,11 +27,13 @@ type Violation struct {
 
 // ViolationReport aggregates all violations for a single analysis session.
 type ViolationReport struct {
-	ID         int64
-	FilePath   string
-	Platform   Platform
-	Timestamp  int64 // Unix timestamp
-	Violations []Violation
+	ID          int64
+	ProjectName string
+	ProjectRoot string
+	FilePath    string
+	Platform    Platform
+	Timestamp   int64 // Unix timestamp
+	Violations  []Violation
 }
 
 // Analyzer is the core logic that takes USN nodes and returns violations.

@@ -39,6 +39,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
@@ -71,6 +72,7 @@ func main() {
 	dirFlag := flag.String("dir", "", "Analyze a full project directory, resolving component trees automatically")
 	excludeFlag := flag.String("exclude", "", "Comma-separated list of directories to exclude from analysis")
 	cssFlag := flag.String("css", "", "Comma-separated list of external CSS/SCSS files to pre-load (for color resolution in single-file mode)")
+	outputFlag := flag.String("output", "", "Save results to a specific file (e.g. results.txt). If empty in project mode, defaults to date_project.txt")
 	watchFlag := flag.Bool("watch", false, "Watch input files for changes and re-analyze automatically")
 	flag.Parse()
 
@@ -101,6 +103,7 @@ func main() {
 	}
 
 	projectRoot, _ := detectProjectRoot()
+	startTime := time.Now()
 
 	if *tuiFlag {
 		m := tui.NewMainModel(repo)
@@ -113,7 +116,7 @@ func main() {
 
 	// --dir: project-aware analysis delegated entirely to the scanner.
 	if *dirFlag != "" {
-		runProjectAnalysis(*dirFlag, cfg, repo)
+		runProjectAnalysis(*dirFlag, cfg, repo, startTime, *outputFlag)
 		return
 	}
 
@@ -126,7 +129,7 @@ func main() {
 	// Auto-detect: if the single positional arg is a directory, delegate to project analysis.
 	if len(args) == 1 {
 		if info, err := os.Stat(args[0]); err == nil && info.IsDir() {
-			runProjectAnalysis(args[0], cfg, repo)
+			runProjectAnalysis(args[0], cfg, repo, startTime, *outputFlag)
 			return
 		}
 	}
@@ -148,6 +151,11 @@ func main() {
 	allReports, hasErrors, hasWarnings := analyzeFiles(args, cfg, extraCSS, repo)
 	printReports(allReports, cfg.Format, projectRoot)
 
+	if cfg.Format == "text" {
+		elapsed := time.Since(startTime)
+		fmt.Printf("\nAnalysis completed in %v. Total files analyzed: %d.\n", elapsed.Round(time.Millisecond), len(args))
+	}
+
 	if hasErrors {
 		os.Exit(1)
 	} else if hasWarnings {
@@ -159,12 +167,14 @@ func main() {
 // Project-aware analysis (--dir flag) — delegates to scanner package
 // ─────────────────────────────────────────────────────────────────────────────
 
-func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Repository) {
+func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Repository, startTime time.Time, outputFilePath string) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not resolve directory: %v\n", err)
 		os.Exit(1)
 	}
+
+	projectName := filepath.Base(absDir)
 
 	// Discover project roots (handles monorepos / multi-project directories).
 	roots := scanner.FindProjectRoots(absDir, cfg.Exclude...)
@@ -172,16 +182,23 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 		fmt.Fprintf(os.Stderr, "No supported project roots found in %s\n", absDir)
 		os.Exit(1)
 	}
-	if len(roots) > 1 && cfg.Format == "text" {
-		fmt.Printf("A11ySentry -- Found %d project(s) in %s\n\n", len(roots), absDir)
+	if cfg.Format == "text" {
+		if len(roots) > 1 {
+			fmt.Printf("A11ySentry -- Found %d project(s) in %s\n\n", len(roots), absDir)
+		} else {
+			// For single project, we still want the label if we are in text mode
+			fmt.Printf("A11ySentry -- Project: %s\n", absDir)
+		}
 	}
 
 	var allReports []domain.ViolationReport
 	hasErrors, hasWarnings := false, false
+	totalFiles := 0
 
 	for _, root := range roots {
-		errs, warns, reports := analyzeProject(root, cfg, repo)
+		errs, warns, reports, fileCount := analyzeProject(root, cfg, repo)
 		allReports = append(allReports, reports...)
+		totalFiles += fileCount
 		if errs {
 			hasErrors = true
 		}
@@ -192,6 +209,22 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 
 	if cfg.Format != "text" {
 		printReports(allReports, cfg.Format, absDir)
+	} else {
+		// If output is specified (or default needed), write to file and don't dump to console
+		if outputFilePath == "" {
+			date := time.Now().Format("2006-01-02")
+			outputFilePath = fmt.Sprintf("%s_%s.txt", date, projectName)
+		}
+
+		err := writeReportsToFile(allReports, outputFilePath, absDir)
+		elapsed := time.Since(startTime)
+		if err != nil {
+			fmt.Printf("\nError writing results to file: %v\n", err)
+			printReports(allReports, "text", absDir) // Fallback to console
+		} else {
+			fmt.Printf("\nAnalysis completed in %v. Total files analyzed: %d.\n", elapsed.Round(time.Millisecond), totalFiles)
+			fmt.Printf("Results saved to: %s\n", outputFilePath)
+		}
 	}
 
 	if hasErrors {
@@ -201,7 +234,23 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	}
 }
 
-func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport) {
+func writeReportsToFile(reports []domain.ViolationReport, path, projectRoot string) error {
+	var b strings.Builder
+	b.WriteString(fmt.Sprintf("A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123)))
+	b.WriteString(strings.Repeat("=", 60) + "\n\n")
+
+	for _, r := range reports {
+		if len(r.Violations) > 0 {
+			b.WriteString(fmt.Sprintf("Page: %s\n", r.FilePath))
+			b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
+			b.WriteString("\n")
+		}
+	}
+
+	return os.WriteFile(path, []byte(b.String()), 0644)
+}
+
+func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport, fileCount int) {
 	// 1. Detect framework and collect files.
 	fw := scanner.Detect(absDir,
 		nextjs.New(),
@@ -212,10 +261,6 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		iosfw.New(),
 		generic.New(),
 	)
-
-	if cfg.Format == "text" {
-		fmt.Printf("A11ySentry -- Project: %s [%s]\n\n", absDir, fw.Name())
-	}
 
 	uiFiles, cssFiles, err := fw.CollectFiles(absDir)
 	if err != nil {
@@ -228,6 +273,7 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		}
 		return
 	}
+	fileCount = len(uiFiles)
 
 	// 2. Build the import graph.
 	importGraph := scanner.BuildImportGraph(uiFiles, fw, absDir)
@@ -242,20 +288,16 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 	// 4. Analyze each tree as a unit.
 	var mu sync.Mutex
 	var wg sync.WaitGroup
+	
+	totalTrees := len(trees)
+	analyzedTrees := 0
+	prog := progress.New(progress.WithDefaultGradient())
+	prog.Width = 60
 
 	for _, t := range trees {
 		wg.Add(1)
 		go func(tree scanner.PageTree) {
 			defer wg.Done()
-
-			// Output label only in text format (note: concurrent output might be jumbled, 
-			// but we use mu to protect shared slices/persistence)
-			if cfg.Format == "text" {
-				mu.Lock()
-				fmt.Printf("  Page: %s\n", tree.Label)
-				printTree(tree.Root, absDir, 1)
-				mu.Unlock()
-			}
 
 			// Choose the right adapter and platform based on the framework.
 			var adapter ports.Adapter
@@ -291,18 +333,24 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			}
 
 			report := domain.ViolationReport{
-				FilePath:   tree.Label,
-				Platform:   platform,
-				Violations: violations,
+				ProjectName: filepath.Base(absDir),
+				ProjectRoot: absDir,
+				FilePath:    tree.Label,
+				Platform:    platform,
+				Violations:  violations,
 			}
 
 			// Persistence.
 			_ = repo.SaveReport(context.Background(), report)
 
 			mu.Lock()
-			if cfg.Format == "text" && len(report.Violations) > 0 {
-				fmt.Printf("\nPage: %s\n", tree.Label)
-				fmt.Print(domain.ToESLintStyle(report.Violations, absDir))
+			analyzedTrees++
+			if cfg.Format == "text" {
+				// \r moves to start of line, \033[K clears the rest of the line
+				fmt.Printf("\r\033[K  Analyzing: %s %s (%d/%d)", 
+					tree.Label,
+					prog.ViewAs(float64(analyzedTrees)/float64(totalTrees)),
+					analyzedTrees, totalTrees)
 			}
 
 			reports = append(reports, report)
@@ -316,6 +364,9 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		}(t)
 	}
 	wg.Wait()
+	if cfg.Format == "text" {
+		fmt.Println() // New line after progress finishes
+	}
 	return
 }
 
@@ -377,6 +428,15 @@ func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, r
 	for _, p := range paths {
 		absPath, _ := filepath.Abs(p)
 		rootNode := &domain.FileNode{FilePath: absPath}
+
+		// Try to find a project root for this file to provide better TUI grouping
+		pRoot := filepath.Dir(absPath)
+		pName := filepath.Base(pRoot)
+		if roots := scanner.FindProjectRoots(pRoot); len(roots) > 0 {
+			pRoot = roots[0]
+			pName = filepath.Base(pRoot)
+		}
+
 		usns, err := adapter.Ingest(context.Background(), rootNode)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", p, err)
@@ -388,9 +448,11 @@ func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, r
 			continue
 		}
 		report := domain.ViolationReport{
-			FilePath:   absPath,
-			Platform:   platform,
-			Violations: violations,
+			ProjectName: pName,
+			ProjectRoot: pRoot,
+			FilePath:    absPath,
+			Platform:    platform,
+			Violations:  violations,
 		}
 
 		_ = repo.SaveReport(context.Background(), report)

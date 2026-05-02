@@ -1,18 +1,53 @@
 {
+  "version": "1.0",
+  "paths": [
+    "src",
+    "app",
+    "pages",
+    "components",
+    "templates"
+  ],
   "exclude": [
     "node_modules",
     ".git",
     "examples",
     "landing"
   ],
-  "exitOnWarning": false,
   "format": "text",
-  "paths": [
-    "src",
-    "app",
-    "pages",
-    "components"
-  ],
+  "exitOnWarning": false,
   "platform": "",
-  "version": "1.0"
+  "rules": {
+    "G141": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "WCAG_1_1_1": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "WCAG_1_3_1": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "WCAG_1_4_3": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "WCAG_2_1_1": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "WCAG_3_1_1": {
+      "enabled": true,
+      "severity": "warning"
+    },
+    "WCAG_3_3_2": {
+      "enabled": true,
+      "severity": "error"
+    },
+    "WCAG_4_1_2": {
+      "enabled": true,
+      "severity": "error"
+    }
+  }
 }
