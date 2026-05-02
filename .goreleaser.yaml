@@ -49,6 +49,7 @@ brews:
     repository:
       owner: mbiondo
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/mbiondo/a11ysentry"
     description: "Universal multi-platform accessibility engine with TUI and MCP support."
