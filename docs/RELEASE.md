@@ -80,7 +80,7 @@ var (
 
 ```bash
 git add CHANGELOG.md cmd/a11ysentry/main.go
-git commit -m "chore: bump version to 1.2.0"
+git commit -m "chore: bump version to 0.0.2"
 git push origin main
 ```
 
@@ -88,10 +88,10 @@ git push origin main
 
 ```bash
 # Create annotated tag
-git tag -a v1.2.0 -m "Release v1.2.0"
+git tag -a v0.0.2 -m "Release v0.0.2"
 
 # Push tag to GitHub
-git push origin v1.2.0
+git push origin v0.0.2
 ```
 
 ### Step 6: Build with GoReleaser
@@ -331,7 +331,7 @@ https://github.com/mbiondo/a11ysentry/releases
 class A11ysentry < Formula
   desc "Universal Accessibility Engine for Multi-Platform UI"
   homepage "https://github.com/mbiondo/a11ysentry"
-  url "https://github.com/mbiondo/a11ysentry/archive/v1.2.0.tar.gz"
+  url "https://github.com/mbiondo/a11ysentry/archive/v0.0.2.tar.gz"
   sha256 "..."
   
   def install
@@ -348,10 +348,10 @@ end
 
 ```json
 {
-  "version": "1.2.0",
+  "version": "0.0.2",
   "description": "Universal Accessibility Engine",
   "homepage": "https://github.com/mbiondo/a11ysentry",
-  "url": "https://github.com/mbiondo/a11ysentry/releases/download/v1.2.0/a11ysentry_Windows_x86_64.zip",
+  "url": "https://github.com/mbiondo/a11ysentry/releases/download/v0.0.2/a11ysentry_Windows_x86_64.zip",
   "bin": "a11ysentry.exe"
 }
 ```
@@ -436,7 +436,7 @@ echo "✅ All smoke tests passed!"
 
 3. **Update PATCH Version:**
    ```bash
-   # 1.2.0 → 1.2.1
+   # 0.0.2 → 1.2.1
    ```
 
 4. **Follow Release Process** (Steps 1-7 above)
@@ -452,7 +452,7 @@ echo "✅ All smoke tests passed!"
 
 3. **Update MINOR Version:**
    ```bash
-   # 1.2.0 → 1.3.0
+   # 0.0.2 → 1.3.0
    ```
 
 4. **Follow Release Process**
@@ -468,7 +468,7 @@ echo "✅ All smoke tests passed!"
 
 3. **Update MAJOR Version:**
    ```bash
-   # 1.2.0 → 2.0.0
+   # 0.0.2 → 2.0.0
    ```
 
 4. **Write Migration Guide** in `CHANGELOG.md`
@@ -483,13 +483,13 @@ echo "✅ All smoke tests passed!"
 
 1. **Delete Tag:**
    ```bash
-   git tag -d v1.2.0
-   git push origin :refs/tags/v1.2.0
+   git tag -d v0.0.2
+   git push origin :refs/tags/v0.0.2
    ```
 
 2. **Delete Release:**
    - Go to GitHub Releases
-   - Delete release v1.2.0
+   - Delete release v0.0.2
    - Delete associated binaries
 
 3. **Fix Issues:**
@@ -511,7 +511,7 @@ Post announcement in release notes:
 ```markdown
 ## Deprecation Notice
 
-Version v1.2.0 has been deprecated due to [issue description].
+Version v0.0.2 has been deprecated due to [issue description].
 Please upgrade to v1.2.1 immediately.
 ```
 
