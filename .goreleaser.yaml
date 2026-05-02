@@ -2,11 +2,6 @@
 # Configuration for A11ySentry Multi-platform Builds
 version: 2
 
-before:
-  hooks:
-    - go mod tidy
-    - go mod download
-
 builds:
   - id: a11ysentry
     main: ./cmd/a11ysentry/main.go
