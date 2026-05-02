@@ -149,7 +149,7 @@ func main() {
 	}
 
 	allReports, hasErrors, hasWarnings := analyzeFiles(args, cfg, extraCSS, repo)
-	printReports(allReports, cfg.Format, projectRoot)
+	printReports(allReports, cfg.Format, projectRoot, *outputFlag)
 
 	if cfg.Format == "text" {
 		elapsed := time.Since(startTime)
@@ -207,24 +207,18 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 		}
 	}
 
-	if cfg.Format != "text" {
-		printReports(allReports, cfg.Format, absDir)
-	} else {
-		// If output is specified (or default needed), write to file and don't dump to console
-		if outputFilePath == "" {
-			date := time.Now().Format("2006-01-02")
-			outputFilePath = fmt.Sprintf("%s_%s.txt", date, projectName)
-		}
+	// Determine output file path if not provided
+	if cfg.Format == "text" && outputFilePath == "" {
+		date := time.Now().Format("2006-01-02")
+		outputFilePath = fmt.Sprintf("%s_%s.txt", date, projectName)
+	}
 
-		err := writeReportsToFile(allReports, outputFilePath, absDir)
+	printReports(allReports, cfg.Format, absDir, outputFilePath)
+
+	if cfg.Format == "text" && outputFilePath != "" {
 		elapsed := time.Since(startTime)
-		if err != nil {
-			fmt.Printf("\nError writing results to file: %v\n", err)
-			printReports(allReports, "text", absDir) // Fallback to console
-		} else {
-			fmt.Printf("\nAnalysis completed in %v. Total files analyzed: %d.\n", elapsed.Round(time.Millisecond), totalFiles)
-			fmt.Printf("Results saved to: %s\n", outputFilePath)
-		}
+		fmt.Printf("\nAnalysis completed in %v. Total files analyzed: %d.\n", elapsed.Round(time.Millisecond), totalFiles)
+		fmt.Printf("Results saved to: %s\n", outputFilePath)
 	}
 
 	if hasErrors {
@@ -232,22 +226,6 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	} else if hasWarnings {
 		os.Exit(2)
 	}
-}
-
-func writeReportsToFile(reports []domain.ViolationReport, path, projectRoot string) error {
-	var b strings.Builder
-	fmt.Fprintf(&b, "A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123))
-	b.WriteString(strings.Repeat("=", 60) + "\n\n")
-
-	for _, r := range reports {
-		if len(r.Violations) > 0 {
-			fmt.Fprintf(&b, "Page: %s\n", r.FilePath)
-			b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
-			b.WriteString("\n")
-		}
-	}
-
-	return os.WriteFile(path, []byte(b.String()), 0644)
 }
 
 func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport, fileCount int) {
@@ -473,22 +451,54 @@ func reportHasWarnings(r domain.ViolationReport) bool {
 	return false
 }
 
-func printReports(reports []domain.ViolationReport, format, projectRoot string) {
+func printReports(reports []domain.ViolationReport, format, projectRoot, outputFilePath string) {
+	var out []byte
+	var err error
+
 	switch format {
 	case "json":
-		data, _ := json.MarshalIndent(reports, "", "  ")
-		fmt.Println(string(data))
+		out, err = json.MarshalIndent(reports, "", "  ")
 	case "sarif":
 		s := sarif.FromReports(reports)
-		data, _ := json.MarshalIndent(s, "", "  ")
-		fmt.Println(string(data))
+		out, err = json.MarshalIndent(s, "", "  ")
 	default:
-		for _, r := range reports {
-			if len(r.Violations) > 0 {
-				fmt.Printf("\nPage: %s\n", shortPath(r.FilePath, projectRoot))
-				fmt.Print(domain.ToESLintStyle(r.Violations, projectRoot))
+		// Text mode handles its own output logic below
+	}
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling results: %v\n", err)
+		return
+	}
+
+	if format != "text" {
+		if outputFilePath != "" {
+			if err := os.WriteFile(outputFilePath, out, 0644); err != nil {
+				fmt.Fprintf(os.Stderr, "Error writing results to %s: %v\n", outputFilePath, err)
 			}
+		} else {
+			fmt.Println(string(out))
 		}
+		return
+	}
+
+	// Text mode logic
+	var b strings.Builder
+	for _, r := range reports {
+		if len(r.Violations) > 0 {
+			fmt.Fprintf(&b, "\nPage: %s\n", shortPath(r.FilePath, projectRoot))
+			b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
+		}
+	}
+
+	if outputFilePath != "" {
+		header := fmt.Sprintf("A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123))
+		separator := strings.Repeat("=", 60) + "\n\n"
+		final := header + separator + b.String()
+		if err := os.WriteFile(outputFilePath, []byte(final), 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing results to %s: %v\n", outputFilePath, err)
+		}
+	} else {
+		fmt.Print(b.String())
 	}
 }
 
@@ -507,7 +517,7 @@ func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo 
 
 	// Initial run.
 	reports, _, _ := analyzeFiles(paths, cfg, extraCSS, repo)
-	printReports(reports, cfg.Format, projectRoot)
+	printReports(reports, cfg.Format, projectRoot, "")
 
 	for {
 		select {
@@ -518,7 +528,7 @@ func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				fmt.Printf("\n[%s] File changed: %s\n", time.Now().Format("15:04:05"), event.Name)
 				reports, _, _ := analyzeFiles([]string{event.Name}, cfg, extraCSS, repo)
-				printReports(reports, cfg.Format, projectRoot)
+				printReports(reports, cfg.Format, projectRoot, "")
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {

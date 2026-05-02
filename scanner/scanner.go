@@ -20,6 +20,7 @@ var ProjectMarkers = []string{
 	"settings.gradle",   // Android settings
 	"settings.gradle.kts",
 	"Package.swift",     // Swift Package Manager
+	"GEMINI.md",         // Agent-driven projects
 }
 
 // ProjectDirExtensions is the set of directory extensions that identify a project root.
