@@ -1,31 +1,94 @@
 ---
-const { title, lang = 'en' } = Astro.props;
+const { title, description = "Universal Accessibility Engine for Multi-Platform UI. Deterministic, local, and blazing fast.", lang = 'en' } = Astro.props;
+const baseUrl = import.meta.env.BASE_URL;
 ---
-<html lang={lang}>
+<!DOCTYPE html>
+<html lang={lang} class="scroll-smooth">
 	<head>
 		<meta charset="utf-8" />
+		<link rel="icon" type="image/svg+xml" href={`${baseUrl}favicon.svg`} />
 		<meta name="viewport" content="width=device-width" />
+		<meta name="generator" content={Astro.generator} />
+        
+        <!-- Primary Meta Tags -->
 		<title>{title}</title>
+        <meta name="title" content={title} />
+        <meta name="description" content={description} />
+
+        <!-- Open Graph / Facebook -->
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={Astro.url} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={`${baseUrl}og-image.png`} />
+
+        <!-- Twitter -->
+        <meta property="twitter:card" content="summary_large_image" />
+        <meta property="twitter:url" content={Astro.url} />
+        <meta property="twitter:title" content={title} />
+        <meta property="twitter:description" content={description} />
+        <meta property="twitter:image" content={`${baseUrl}og-image.png`} />
+
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 	</head>
-	<body class="bg-slate-900 text-white font-sans selection:bg-blue-500 selection:text-white">
-        <nav class="py-6 px-6 flex justify-between items-center max-w-6xl mx-auto">
-            <div class="text-2xl font-bold tracking-tighter flex items-center gap-2">
-                <span class="text-blue-500 text-3xl">🛡️</span> a11ysentry
+	<body class="bg-slate-950 text-slate-50 font-sans antialiased">
+        <a href="#main-content" class="skip-to-content">Skip to content</a>
+
+        <header class="sticky top-0 z-40 w-full border-b border-slate-800/50 bg-slate-950/80 backdrop-blur-lg">
+            <nav class="py-4 px-6 flex justify-between items-center max-w-7xl mx-auto" aria-label="Main Navigation">
+                <a href={baseUrl} class="text-xl font-extrabold tracking-tighter flex items-center gap-2 group focus-visible:ring-offset-4 focus-visible:ring-neon-cyan">
+                    <span class="text-neon-cyan text-2xl group-hover:scale-110 transition-transform duration-300">🛡️</span> 
+                    <span class="bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">a11ysentry</span>
+                </a>
+                
+                <div class="hidden md:flex gap-8 items-center">
+                    <a href="#features" class="text-sm font-semibold text-slate-400 hover:text-white transition-colors">Features</a>
+                    <a href="#mcp" class="text-sm font-semibold text-slate-400 hover:text-white transition-colors">MCP Integration</a>
+                    <a href="https://github.com/mbiondo/a11ysentry" class="bg-white text-slate-950 px-5 py-2 rounded-full text-sm font-bold hover:bg-neon-cyan transition-all duration-300 shadow-lg shadow-neon-cyan/10" aria-label="View source on GitHub">
+                        GitHub
+                    </a>
+                </div>
+            </nav>
+        </header>
+
+		<main id="main-content">
+		    <slot />
+        </main>
+
+        <footer class="py-20 border-t border-slate-900 bg-black/20" role="contentinfo">
+            <div class="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-12 text-center md:text-left">
+                <div class="space-y-4">
+                    <div class="text-xl font-bold tracking-tighter flex items-center justify-center md:justify-start gap-2">
+                        <span class="text-neon-cyan">🛡️</span> a11ysentry
+                    </div>
+                    <p class="text-sm text-slate-500 max-w-xs mx-auto md:mx-0">
+                        Ensuring a web that works for everyone. Deterministic, local, and accessible by design.
+                    </p>
+                </div>
+                
+                <div class="space-y-4">
+                    <h3 class="font-bold text-white uppercase tracking-widest text-xs">Project</h3>
+                    <ul class="space-y-2 text-sm text-slate-400">
+                        <li><a href="https://github.com/mbiondo/a11ysentry" class="hover:text-neon-cyan transition-colors">Open Source</a></li>
+                        <li><a href={`${baseUrl}docs`} class="hover:text-neon-cyan transition-colors">Documentation</a></li>
+                        <li><a href="https://github.com/mbiondo/a11ysentry/releases" class="hover:text-neon-cyan transition-colors">Releases</a></li>
+                    </ul>
+                </div>
+
+                <div class="space-y-4">
+                    <h3 class="font-bold text-white uppercase tracking-widest text-xs">Connect</h3>
+                    <ul class="space-y-2 text-sm text-slate-400">
+                        <li><a href="#" class="hover:text-neon-cyan transition-colors">Twitter / X</a></li>
+                        <li><a href="#" class="hover:text-neon-cyan transition-colors">Discord Community</a></li>
+                        <li><a href="mailto:hello@a11ysentry.dev" class="hover:text-neon-cyan transition-colors">Contact Support</a></li>
+                    </ul>
+                </div>
             </div>
-            <div class="flex gap-4 items-center">
-                <a href="/" class="text-sm font-medium hover:text-blue-400 transition-colors">EN</a>
-                <span class="text-slate-700">|</span>
-                <a href="/es" class="text-sm font-medium hover:text-blue-400 transition-colors">ES</a>
-                <a href="https://github.com/mbiondo/a11ysentry" class="ml-4 bg-slate-800 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-700 transition-all border border-slate-700">GitHub</a>
-            </div>
-        </nav>
-		<slot />
-        <footer class="py-20 border-t border-slate-800 text-center text-slate-500">
-            <p>&copy; 2026 a11ysentry. Built with ❤️ for everyone.</p>
-            <div class="mt-4 flex justify-center gap-6 text-sm">
-                <a href="#" class="hover:text-white transition-colors">Documentation</a>
-                <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
-                <a href="#" class="hover:text-white transition-colors">Enterprise</a>
+            
+            <div class="mt-20 pt-8 border-t border-slate-900 text-center text-xs text-slate-600">
+                <p>&copy; 2026 A11ySentry Project. Built for the modern inclusion age.</p>
             </div>
         </footer>
 	</body>

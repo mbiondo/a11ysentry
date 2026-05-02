@@ -1,41 +1,51 @@
 ---
 ---
-<section class="py-24 px-6 max-w-5xl mx-auto">
-    <div class="text-center mb-16">
-        <h2 class="text-4xl font-bold mb-4">Local Binary vs Cloud LLM</h2>
-        <p class="text-slate-400">The engineering choice for modern CTOs and Investors.</p>
-    </div>
-    <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse bg-slate-900 rounded-2xl overflow-hidden border border-slate-800">
-            <thead>
-                <tr class="bg-slate-800/50 text-slate-300">
-                    <th class="p-6 font-bold">Factor</th>
-                    <th class="p-6 font-bold text-blue-400">a11ysentry (Local)</th>
-                    <th class="p-6 font-bold text-slate-500">Cloud LLM (Traditional)</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-slate-800">
-                <tr>
-                    <td class="p-6 font-semibold">Monthly Cost</td>
-                    <td class="p-6 text-emerald-400 font-medium">Zero (Predictable)</td>
-                    <td class="p-6 text-red-400 font-medium">Token-based (Variable/Expensive)</td>
-                </tr>
-                <tr>
-                    <td class="p-6 font-semibold">Accuracy</td>
-                    <td class="p-6 text-emerald-400 font-medium">Deterministic (WCAG Rules)</td>
-                    <td class="p-6 text-red-400 font-medium">Probabilistic (Hallucination Risk)</td>
-                </tr>
-                <tr>
-                    <td class="p-6 font-semibold">Latency</td>
-                    <td class="p-6 text-emerald-400 font-medium">Milliseconds (Native)</td>
-                    <td class="p-6 text-red-400 font-medium">Seconds (Network/API dependent)</td>
-                </tr>
-                <tr>
-                    <td class="p-6 font-semibold">Privacy</td>
-                    <td class="p-6 text-emerald-400 font-medium">100% Local (Air-gapped)</td>
-                    <td class="p-6 text-red-400 font-medium">Data sent to 3rd party</td>
-                </tr>
-            </tbody>
-        </table>
+<section class="py-24 px-6 relative overflow-hidden">
+    <div class="max-w-5xl mx-auto relative z-10">
+        <div class="text-center mb-16 space-y-4">
+            <h2 class="text-3xl md:text-5xl font-bold tracking-tight text-white">Engineering vs. <span class="text-slate-500">Probability</span></h2>
+            <p class="text-slate-400">Why deterministic analysis wins for mission-critical accessibility.</p>
+        </div>
+
+        <div class="glass rounded-3xl overflow-hidden shadow-2xl border-slate-800">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-900/80 border-b border-slate-800">
+                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-500">Technical Factor</th>
+                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-neon-cyan bg-neon-cyan/5">A11ySentry (Engine)</th>
+                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-500">Cloud LLM / AI</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/50">
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-8 font-semibold text-slate-300">Validation Model</td>
+                            <td class="p-8 bg-neon-cyan/5 text-white font-medium">Deterministic (WCAG Rules)</td>
+                            <td class="p-8 text-slate-500">Probabilistic (Inference)</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-8 font-semibold text-slate-300">Cost Structure</td>
+                            <td class="p-8 bg-neon-cyan/5 text-neon-emerald font-bold italic">Zero (Run Anywhere)</td>
+                            <td class="p-8 text-slate-500">Usage-based (Per Token)</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-8 font-semibold text-slate-300">Accuracy Assurance</td>
+                            <td class="p-8 bg-neon-cyan/5 text-white font-medium">100% Correctness</td>
+                            <td class="p-8 text-red-400/80 font-medium">Hallucination Risk</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-8 font-semibold text-slate-300">Data Sovereignty</td>
+                            <td class="p-8 bg-neon-cyan/5 text-white font-medium">Air-Gapped / Private</td>
+                            <td class="p-8 text-slate-500">External Transmission</td>
+                        </tr>
+                        <tr class="hover:bg-slate-800/30 transition-colors">
+                            <td class="p-8 font-semibold text-slate-300">Speed (Latency)</td>
+                            <td class="p-8 bg-neon-cyan/5 text-white font-medium">&lt; 50ms (Native Go)</td>
+                            <td class="p-8 text-slate-500">Seconds (Network/API)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </section>

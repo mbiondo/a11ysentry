@@ -2,4 +2,49 @@
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-neon-cyan: #22d3ee;
+  --color-neon-emerald: #10b981;
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased selection:bg-neon-cyan/30 selection:text-neon-cyan;
+  }
+
+  /* Spectacular Focus Rings for Accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-neon-cyan ring-offset-2 ring-offset-slate-950 transition-shadow duration-200;
+  }
+
+  /* Skip to Content for Keyboard Users */
+  .skip-to-content {
+    @apply absolute -top-20 left-4 z-50 bg-neon-cyan text-slate-950 px-4 py-2 font-bold transition-all focus:top-4;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-slate-900/50 backdrop-blur-md border border-slate-800;
+  }
+
+  .text-glow {
+    text-shadow: 0 0 15px rgba(34, 211, 238, 0.5);
+  }
+}
+
+/* Reduced Motion Safety */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-delay: -1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    background-attachment: initial !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0s !important;
+    transition-delay: 0s !important;
+  }
 }

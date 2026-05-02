@@ -3,29 +3,63 @@ import Layout from '../layouts/Layout.astro';
 import Hero from '../components/Hero.astro';
 import Features from '../components/Features.astro';
 import Comparison from '../components/Comparison.astro';
+import MultiPlatform from '../components/MultiPlatform.astro';
+import MCPIntegration from '../components/MCPIntegration.astro';
 import '../styles/global.css';
 ---
 
-<Layout title="a11ysentry | Local & Deterministic Accessibility Engine">
+<Layout title="A11ySentry | The Deterministic Accessibility Engine">
 	<main>
-        <h1 class="sr-only">a11ysentry: Local and Deterministic Accessibility Engineering</h1>
+        <h1 class="sr-only">A11ySentry: Universal and Deterministic Accessibility Engineering</h1>
 		<Hero />
+        <MultiPlatform />
 		<Features />
+        <MCPIntegration />
         <Comparison />
         
-        <section class="py-24 text-center px-6">
-            <div class="bg-gradient-to-br from-blue-700 to-emerald-700 p-12 rounded-3xl max-w-4xl mx-auto shadow-2xl">
-                <h2 class="text-4xl font-extrabold mb-6">Stop guessing. Start ensuring.</h2>
-                <p class="text-xl mb-10 text-blue-50 text-white opacity-90">Secure your UI with real engineering today.</p>
-                <div class="flex justify-center gap-4">
-                    <button class="bg-white text-blue-700 px-6 h-10 rounded-lg font-bold text-xs uppercase">Quick Fix</button>
-                    <button role="switch" aria-pressed="false" class="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold hover:bg-black transition-all">Enable A11y</button>
+        <!-- Spectacular CTA -->
+        <section id="install" class="py-32 px-6 relative overflow-hidden">
+            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-4xl opacity-20 blur-[100px] bg-gradient-to-r from-neon-cyan to-neon-emerald rounded-full"></div>
+            
+            <div class="max-w-4xl mx-auto glass p-12 md:p-20 rounded-[3rem] text-center space-y-10 relative z-10 border-neon-emerald/20">
+                <h2 class="text-4xl md:text-6xl font-black tracking-tight leading-none">
+                    Ready to secure <br/> <span class="text-neon-emerald">your UI?</span>
+                </h2>
+                <p class="text-xl text-slate-400 max-w-lg mx-auto leading-relaxed">
+                    Join the modern accessibility age. Local, private, and deterministic by default.
+                </p>
+                
+                <div class="space-y-6">
+                    <div class="bg-black/40 p-6 rounded-2xl border border-slate-800 max-w-md mx-auto group">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Install</span>
+                            <span class="text-neon-emerald text-xs font-mono">PowerShell / Bash</span>
+                        </div>
+                        <div class="font-mono text-sm text-left overflow-x-auto whitespace-nowrap scrollbar-hide">
+                            <code class="text-slate-300">curl -sSL https://a11ysentry.dev/install.sh | bash</code>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-col sm:flex-row justify-center gap-4">
+                        <a href="https://github.com/mbiondo/a11ysentry" class="bg-white text-slate-950 px-10 py-4 rounded-2xl font-black hover:bg-neon-cyan transition-all duration-300">
+                            Star on GitHub
+                        </a>
+                        <a href={`${import.meta.env.BASE_URL}docs`} class="glass px-10 py-4 rounded-2xl font-bold hover:bg-white/5 transition-all duration-300">
+                            Read Docs
+                        </a>
+                    </div>
                 </div>
             </div>
         </section>
 	</main>
-    <footer class="py-10 border-t border-slate-800 text-center text-slate-400">
-        <p>&copy; 2026 a11ysentry. Build with ❤️ for everyone.</p>
-        <img src="/logo-gray.png" alt="a11ysentry secondary logo" class="mx-auto mt-4 opacity-50" />
-    </footer>
 </Layout>
+
+<style>
+    .scrollbar-hide::-webkit-scrollbar {
+        display: none;
+    }
+    .scrollbar-hide {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+</style>

@@ -1,29 +1,47 @@
 ---
+const features = [
+    {
+        icon: "💰",
+        title: "Predictable Cost",
+        description: "Zero token fees. Run unlimited audits locally without burning your API budget.",
+        color: "text-neon-cyan"
+    },
+    {
+        icon: "🧠",
+        title: "Zero Hallucinations",
+        description: "Pure engineering logic based on WCAG 2.2 specs. No probabilistic guesswork.",
+        color: "text-neon-emerald"
+    },
+    {
+        icon: "🔒",
+        title: "Air-Gapped Privacy",
+        description: "Your source code never leaves your infrastructure. 100% corporate-ready.",
+        color: "text-purple-400"
+    },
+    {
+        icon: "⚡",
+        title: "Native Speed",
+        description: "Analyze thousands of component nodes in milliseconds with our Go engine.",
+        color: "text-amber-400"
+    }
+];
 ---
-<section class="py-24 bg-slate-800/50">
-    <div class="max-w-6xl mx-auto px-6 text-center">
-        <h2 class="text-4xl font-bold mb-16">Why a11ysentry?</h2>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            <div class="p-8 bg-slate-900 rounded-2xl border border-slate-700 text-left hover:border-blue-500/50 transition-all">
-                <div class="text-blue-500 text-3xl mb-4">💰</div>
-                <h3 class="text-xl font-bold mb-3">Token Savings</h3>
-                <p class="text-slate-400 leading-relaxed">Stop burning money sending 100K tokens to APIs for an audit. Zero inference cost.</p>
-            </div>
-            <div class="p-8 bg-slate-900 rounded-2xl border border-slate-700 text-left hover:border-blue-500/50 transition-all">
-                <div class="text-emerald-500 text-3xl mb-4">🧠</div>
-                <h3 class="text-xl font-bold mb-3">Zero Hallucinations</h3>
-                <p class="text-slate-400 leading-relaxed">We don't use probabilistic models. We apply pure WCAG 2.2 rules on your semantic tree.</p>
-            </div>
-            <div class="p-8 bg-slate-900 rounded-2xl border border-slate-700 text-left hover:border-blue-500/50 transition-all">
-                <div class="text-purple-500 text-3xl mb-4">🔒</div>
-                <h3 class="text-xl font-bold mb-3">Total Privacy</h3>
-                <p class="text-slate-400 leading-relaxed">Your source code never leaves your infrastructure. 100% GDPR and corporate-ready.</p>
-            </div>
-            <div class="p-8 bg-slate-900 rounded-2xl border border-slate-700 text-left hover:border-blue-500/50 transition-all">
-                <div class="text-amber-500 text-3xl mb-4">⚡</div>
-                <h3 class="text-xl font-bold mb-3">CI/CD Power</h3>
-                <p class="text-slate-400 leading-relaxed">Process thousands of components in milliseconds. Native speed for modern pipelines.</p>
-            </div>
+<section id="features" class="py-24 bg-slate-900/30">
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="text-center mb-16 space-y-4">
+            <h2 class="text-3xl md:text-5xl font-bold tracking-tight">Built for modern <span class="text-neon-emerald">assurance.</span></h2>
+            <p class="text-slate-400 max-w-2xl mx-auto">The deterministic alternative to AI-based accessibility testing.</p>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {features.map(f => (
+                <div class="glass p-8 rounded-2xl group hover:border-neon-cyan/50 transition-all duration-500 relative overflow-hidden focus-within:ring-2 focus-within:ring-neon-cyan">
+                    <div class="absolute -top-10 -right-10 w-24 h-24 bg-neon-cyan/5 blur-3xl rounded-full group-hover:bg-neon-cyan/10 transition-colors"></div>
+                    <div class={`text-4xl mb-6 ${f.color}`}>{f.icon}</div>
+                    <h3 class="text-xl font-bold mb-3 text-white">{f.title}</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">{f.description}</p>
+                </div>
+            ))}
         </div>
     </div>
 </section>
