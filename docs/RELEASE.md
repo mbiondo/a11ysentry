@@ -48,14 +48,15 @@ v1.2.3-rc.2
 Edit `CHANGELOG.md`:
 
 ```markdown
-## [0.0.1] - 2026-04-30
+## [0.0.2] - 2026-05-02
 
 ### Added
-- Initial release of A11ySentry
-- Core engine with deterministic validation pipeline
-- Universal Semantic Node (USN) abstraction layer
-- Support for 15+ platforms (Web, Mobile, Gaming, Desktop)
-- MCP server for AI agent integration
+- Advanced WCAG rules for landmarks, modals, and fieldsets.
+- WCAG 2.1.1 keyboard navigation rules.
+- Responsive TUI refactor and auto-resolving MCP.
+- Global install scripts and simplified CLI usage.
+
+## [0.0.1] - 2026-04-30
 ```
 
 ### Step 2: Run Tests
@@ -71,7 +72,7 @@ Update version in `cmd/a11ysentry/main.go`:
 
 ```go
 var (
-    Version = "0.0.1"
+    Version = "0.0.2"
 )
 ```
 

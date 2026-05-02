@@ -19,7 +19,9 @@ Most accessibility tools are platform-locked. A11ySentry introduces the **Univer
   - **Gaming**: Unity, Godot.
 - **Recursive Component Context**: Analyzes entire component trees (Page + Components) to avoid false positives by cross-referencing labels and states across files.
 - **Tailwind 4 Support**: Built-in heuristic mapping for Tailwind CSS 4 utility classes (colors, spacing, etc.) for zero-runtime static analysis.
-- **WCAG 2.2 Ready**: Implements the latest accessibility standards, including the new Web Touch Target (24px) and Aria State requirements.
+- **WCAG 2.2 Ready**: Implements the latest accessibility standards, including the new Web Touch Target (24px), Aria State requirements, and **advanced keyboard navigation (WCAG 2.1.1)**.
+- **Advanced Semantic Rules**: New rules for landmarks, modals, and fieldsets to ensure deeper structural accessibility.
+- **Engine v2 Context**: Hierarchical FileNode analysis that allows components to inherit accessibility context from their parents (e.g., labels from modals to inputs).
 - **Unified CLI**: Analyze files, view history in TUI, or start MCP from a single binary.
 - **Interactive TUI Dashboard**: Visual dashboard for audit history and violation tracking.
 - **Universal MCP Support**: Register A11ySentry in **Claude, Cursor, VS Code, Gemini CLI, Qwen-Coder, and OpenCode** with one command.

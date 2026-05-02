@@ -296,14 +296,14 @@ Found a typo? Want to improve documentation?
 
 | Document | Status | Last Updated |
 |----------|--------|--------------|
-| API Reference | ✅ Complete | 2026-04-30 |
-| Architecture Deep Dive | ✅ Complete | 2026-04-30 |
-| Developer Guide | ✅ Complete | 2026-04-30 |
-| MCP Integration Guide | ✅ Complete | 2026-04-30 |
-| Release Guide | ✅ Complete | 2026-04-30 |
-| Examples Documentation | ✅ Complete | 2026-04-30 |
-| Architecture (High-Level) | ✅ Complete | 2026-04-30 |
-| Standards | ✅ Complete | 2026-04-30 |
+| API Reference | ✅ Complete | 2026-05-02 |
+| Architecture Deep Dive | ✅ Complete | 2026-05-02 |
+| Developer Guide | ✅ Complete | 2026-05-02 |
+| MCP Integration Guide | ✅ Complete | 2026-05-02 |
+| Release Guide | ✅ Complete | 2026-05-02 |
+| Examples Documentation | ✅ Complete | 2026-05-02 |
+| Architecture (High-Level) | ✅ Complete | 2026-05-02 |
+| Standards | ✅ Complete | 2026-05-02 |
 
 **Legend:**
 - ✅ Complete: Comprehensive coverage
