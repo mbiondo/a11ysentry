@@ -30,13 +30,28 @@ import '../styles/global.css';
                 </p>
                 
                 <div class="space-y-6">
-                    <div class="bg-black/40 p-6 rounded-2xl border border-slate-800 max-w-md mx-auto group">
-                        <div class="flex justify-between items-center mb-4">
+                    <div class="bg-black/40 p-8 rounded-3xl border border-slate-800 max-w-xl mx-auto group">
+                        <div class="flex justify-between items-center mb-6">
                             <span class="text-[10px] font-bold uppercase tracking-widest text-slate-500">Quick Install</span>
-                            <span class="text-neon-emerald text-xs font-mono">PowerShell / Bash</span>
+                            <div class="flex gap-2">
+                                <span class="px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 text-[10px] font-bold border border-blue-500/20">Windows</span>
+                                <span class="px-2 py-0.5 rounded bg-orange-500/10 text-orange-400 text-[10px] font-bold border border-orange-500/20">Unix</span>
+                            </div>
                         </div>
-                        <div class="font-mono text-sm text-left overflow-x-auto whitespace-nowrap scrollbar-hide">
-                            <code class="text-slate-300">curl -sSL https://a11ysentry.dev/install.sh | bash</code>
+                        
+                        <div class="space-y-4 font-mono text-xs text-left">
+                            <div class="space-y-2">
+                                <div class="text-slate-500 text-[9px] uppercase font-bold tracking-tighter">PowerShell (Admin)</div>
+                                <code class="block bg-slate-900/50 p-3 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover:border-neon-cyan/30 transition-colors">
+                                    irm https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.ps1 | iex
+                                </code>
+                            </div>
+                            <div class="space-y-2">
+                                <div class="text-slate-500 text-[9px] uppercase font-bold tracking-tighter">Bash / Zsh</div>
+                                <code class="block bg-slate-900/50 p-3 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover:border-neon-emerald/30 transition-colors">
+                                    curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
+                                </code>
+                            </div>
                         </div>
                     </div>
                     

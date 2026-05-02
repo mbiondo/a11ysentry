@@ -54,28 +54,49 @@
                 <div class="p-6 font-mono text-sm sm:text-base space-y-4">
                     <div class="flex gap-3">
                         <span class="text-neon-cyan">$</span>
-                        <span class="text-slate-300">a11ysentry ./src/Button.tsx</span>
+                        <span class="text-slate-300">a11ysentry .</span>
                     </div>
                     <div class="space-y-2">
-                        <div class="text-slate-500 italic"># Resolving USN Component Tree...</div>
-                        <div class="flex items-center gap-2 text-neon-emerald">
+                        <div class="text-slate-500 italic text-xs"># Resolving component trees & USN mappings...</div>
+                        <div class="flex items-center gap-2 text-neon-emerald text-xs">
                             <span>✓</span>
-                            <span>Parsing React Adapter</span>
-                        </div>
-                        <div class="flex items-center gap-2 text-neon-emerald">
-                            <span>✓</span>
-                            <span>Normalization successful</span>
+                            <span>Astro, React, and Tailwind adapters loaded</span>
                         </div>
                     </div>
-                    <div class="pt-2 border-t border-slate-800/50">
-                        <div class="text-red-400 font-bold mb-1">Found 1 Violation:</div>
-                        <div class="pl-4 border-l-2 border-red-500/30 space-y-1">
-                            <div class="text-slate-300">Rule: <span class="text-white">WCAG 2.1.1 (Keyboard)</span></div>
-                            <div class="text-slate-300 text-xs opacity-70">Line 42: Interactive element &lt;div&gt; missing 'role' and 'tabindex'.</div>
+                    
+                    <div class="pt-4 border-t border-slate-800/50 space-y-4">
+                        <div class="flex items-center gap-2 text-[10px]">
+                            <span class="text-neon-cyan">🛡️</span>
+                            <span class="text-slate-400 uppercase tracking-widest">Analysis Results:</span>
+                            <span class="text-white">analytics-dashboard/app/page.tsx</span>
+                        </div>
+                        
+                        <div class="text-xs font-bold text-slate-300">Found 10 issues (8 errors, 2 warnings)</div>
+                        
+                        <div class="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3">
+                            <div class="flex items-center gap-3">
+                                <span class="px-1.5 py-0.5 bg-red-500 text-slate-950 text-[9px] font-black rounded-sm">ERROR</span>
+                                <span class="text-red-400 font-bold text-[10px]">WCAG_3_3_2</span>
+                            </div>
+                            <p class="text-white text-[11px] leading-relaxed">input missing accessible name or label.</p>
+                            <div class="space-y-1.5">
+                                <div class="text-[9px] text-neon-cyan font-bold uppercase tracking-tighter">SOURCE CODE:</div>
+                                <code class="block bg-black/40 p-2 rounded text-[10px] text-slate-300 border border-slate-800/50 overflow-hidden">
+                                    &lt;select value="&#123;customerId&#125;" onValueChange="&#123;setCustomerId&#125;"&gt;
+                                </code>
+                            </div>
+                            <div class="space-y-1">
+                                <div class="text-[9px] text-neon-emerald font-bold uppercase tracking-tighter">SUGGESTED FIX:</div>
+                                <p class="text-[10px] text-slate-300">Ensure the control has a visible label or an internal accessibility name.</p>
+                            </div>
+                            <div class="text-[9px] text-slate-500">
+                                Learn more: <span class="underline">https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA14</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="pt-4 text-xs text-slate-500 flex justify-between items-center">
-                        <span>Analysis complete in 12ms</span>
+
+                    <div class="pt-4 text-[10px] text-slate-500 flex justify-between items-center opacity-50">
+                        <span>Analysis complete in 24ms</span>
                         <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">100% Deterministic</span>
                     </div>
                 </div>
