@@ -20,6 +20,8 @@ var ProjectMarkers = []string{
 	"settings.gradle",   // Android settings
 	"settings.gradle.kts",
 	"Package.swift",     // Swift Package Manager
+	"a11ysentry.json",   // Tool-specific config
+	"go.mod",            // Go projects
 	"GEMINI.md",         // Agent-driven projects
 }
 
