@@ -111,22 +111,24 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "esc":
-			if m.state == stateProjectReports {
+			switch m.state {
+			case stateProjectReports:
 				m.state = stateProjects
 				return m, nil
-			} else if m.state == stateResults {
+			case stateResults:
 				m.state = stateProjectReports
 				return m, nil
 			}
 		case "enter":
-			if m.state == stateProjects {
+			switch m.state {
+			case stateProjects:
 				if i, ok := m.projectsList.SelectedItem().(projectItem); ok {
 					m.selectedProject = i.name
 					m.updateReportsList()
 					m.state = stateProjectReports
 					return m, nil
 				}
-			} else if m.state == stateProjectReports {
+			case stateProjectReports:
 				if i, ok := m.reportsList.SelectedItem().(reportItem); ok {
 					m.results = i.report
 					m.state = stateResults

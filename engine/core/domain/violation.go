@@ -205,10 +205,6 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 
 			// Track unique labels for landmarks of same type
 			if node.Label != "" {
-				if firstSrc, exists := landmarkLabels[node.Role][node.Label]; exists && firstSrc.FilePath != node.Source.FilePath || firstSrc.Line != node.Source.Line {
-					// We warn if two different landmarks of same type have same label
-					// actually, ARIA says landmarks of SAME role should have DIFFERENT labels to be distinguishable.
-				}
 				landmarkLabels[node.Role][node.Label] = node.Source
 			}
 

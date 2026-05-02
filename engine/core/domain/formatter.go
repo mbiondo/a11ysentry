@@ -27,14 +27,13 @@ func ToESLintStyle(violations []Violation, projectRoot string) string {
 		}
 
 		// Format: path:line:col  severity  message  [code]
-		sb.WriteString(fmt.Sprintf("  %s:%d:%d  %s  %s  [%s]\n",
+		fmt.Fprintf(&sb, "  %s:%d:%d  %s  %s  [%s]\n",
 			relPath,
 			v.SourceRef.Line,
 			v.SourceRef.Column,
 			severity,
 			v.Message,
-			v.ErrorCode,
-		))
+			v.ErrorCode)
 	}
 
 	return sb.String()

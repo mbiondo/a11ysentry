@@ -16,13 +16,6 @@ var (
 			Padding(0, 2)
 
 	docStyle = lipgloss.NewStyle().Margin(1, 2)
-
-	dashboardTitleStyle = lipgloss.NewStyle().
-			Background(lipgloss.Color("#00ADD8")).
-			Foreground(lipgloss.Color("#FFFFFF")).
-			Bold(true).
-			Padding(0, 1).
-			MarginBottom(1)
 )
 
 func (m MainModel) projectsView() string {

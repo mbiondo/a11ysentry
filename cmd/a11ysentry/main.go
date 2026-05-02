@@ -236,12 +236,12 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 
 func writeReportsToFile(reports []domain.ViolationReport, path, projectRoot string) error {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123)))
+	fmt.Fprintf(&b, "A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123))
 	b.WriteString(strings.Repeat("=", 60) + "\n\n")
 
 	for _, r := range reports {
 		if len(r.Violations) > 0 {
-			b.WriteString(fmt.Sprintf("Page: %s\n", r.FilePath))
+			fmt.Fprintf(&b, "Page: %s\n", r.FilePath)
 			b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
 			b.WriteString("\n")
 		}
@@ -370,18 +370,6 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 	return
 }
 
-func printTree(node *domain.FileNode, base string, indent int) {
-	if node == nil {
-		return
-	}
-	prefix := strings.Repeat("  ", indent)
-	fmt.Printf("%s|-- %s\n", prefix, shortPath(node.FilePath, base))
-	for _, child := range node.Children {
-		printTree(child, base, indent+1)
-	}
-}
-
-
 func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo ports.Repository) (reports []domain.ViolationReport, hasErrors, hasWarnings bool) {
 	// Standard analysis (not project-aware) — falls back to Generic adapter.
 	var adapter ports.Adapter
@@ -456,14 +444,14 @@ func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, r
 		}
 
 		_ = repo.SaveReport(context.Background(), report)
-					reports = append(reports, report)
-			if reportHasErrors(report) {
-				hasErrors = true
-			}
-			if reportHasWarnings(report) {
-				hasWarnings = true
-			}
+		reports = append(reports, report)
+		if reportHasErrors(report) {
+			hasErrors = true
 		}
+		if reportHasWarnings(report) {
+			hasWarnings = true
+		}
+	}
 	return
 }
 

@@ -84,7 +84,7 @@ func (m MainModel) resultsView() string {
 			content.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Width(contentWidth-6).Render("Learn more: "+v.DocumentationURL))
 		}
 
-		style := violationStyle.Copy().Width(contentWidth)
+		style := violationStyle.Width(contentWidth)
 		if isNarrow {
 			style = style.Padding(0, 1).MarginBottom(1)
 		}
