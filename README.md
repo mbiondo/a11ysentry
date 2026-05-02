@@ -56,12 +56,12 @@ a11ysentry init
 a11ysentry path/to/file.html
 
 # Analyze full project (resolves component trees)
-a11ysentry --dir ./src
+a11ysentry .
 
 # Output formats
-a11ysentry --format sarif --dir ./src > results.sarif   # GitHub Code Scanning
-a11ysentry --format json --dir ./src                    # Machine-readable JSON
-a11ysentry --format text --dir ./src                    # Human-readable (default)
+a11ysentry --format sarif . > results.sarif   # GitHub Code Scanning
+a11ysentry --format json .                    # Machine-readable JSON
+a11ysentry --format text .                    # Human-readable (default)
 
 # Pre-load CSS for accurate color contrast
 a11ysentry --css global.css,branding.css Component.vue

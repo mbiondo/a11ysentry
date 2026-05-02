@@ -755,7 +755,7 @@ jobs:
       - name: Install A11ySentry
         run: curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
       - name: Run Accessibility Audit (SARIF)
-        run: a11ysentry --format sarif --dir . > results.sarif
+        run: a11ysentry --format sarif . > results.sarif
         continue-on-error: true
       - name: Upload SARIF to GitHub Code Scanning
         uses: github/codeql-action/upload-sarif@v3
@@ -763,7 +763,7 @@ jobs:
           sarif_file: results.sarif
           category: a11ysentry
       - name: Run Accessibility Audit (Text / Exit Codes)
-        run: a11ysentry --dir .
+        run: a11ysentry .
         continue-on-error: true
 `
 	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
