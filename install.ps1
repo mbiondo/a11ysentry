@@ -6,7 +6,7 @@ $Owner = "mbiondo"
 $Repo = "a11ysentry"
 $BinaryName = "a11ysentry.exe"
 
-Write-Host "🛡️  A11ySentry: Starting smart installation for Windows..." -ForegroundColor Cyan
+Write-Host "???????  A11ySentry: Starting smart installation for Windows..." -ForegroundColor Cyan
 
 # 1. Detect Arch
 $Arch = "amd64"
@@ -29,9 +29,9 @@ if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
 
 if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
     Copy-Item $LocalBinary -Destination $BinaryFull -Force
-    Write-Host "🚧 DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
+    Write-Host "???? DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
 } else {
-    Write-Host "📥 Downloading latest release from GitHub..." -ForegroundColor Cyan
+    Write-Host "???? Downloading latest release from GitHub..." -ForegroundColor Cyan
     $LatestReleaseUrl = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
     try {
         $ReleaseInfo = Invoke-RestMethod -Uri $LatestReleaseUrl -UseBasicParsing
