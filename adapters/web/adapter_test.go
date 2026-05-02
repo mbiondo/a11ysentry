@@ -33,7 +33,7 @@ func TestHTMLAdapter_CSSAnalysis(t *testing.T) {
 	}
 
 	adapter := NewHTMLAdapter()
-	nodes, err := adapter.Ingest(context.Background(), []string{tmpFile.Name()})
+	nodes, err := adapter.Ingest(context.Background(), &domain.FileNode{FilePath: tmpFile.Name()})
 	if err != nil {
 		t.Fatalf("Ingest failed: %v", err)
 	}

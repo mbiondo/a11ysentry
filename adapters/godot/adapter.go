@@ -16,20 +16,48 @@ func NewGodotAdapter() ports.Adapter {
 	return &godotAdapter{}
 }
 
-func (a *godotAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *godotAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-		nodes := a.parseTSCN(string(content), file)
-		allNodes = append(allNodes, nodes...)
+			nodes := a.parseTSCN(string(content), f)
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
+			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	return allNodes, nil
+}
+
+func (a *godotAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 func (a *godotAdapter) parseTSCN(content string, filename string) []domain.USN {

@@ -36,7 +36,7 @@ type ViolationReport struct {
 
 // Analyzer is the core logic that takes USN nodes and returns violations.
 type Analyzer interface {
-	Analyze(ctx context.Context, nodes []USN) ([]Violation, error)
+	Analyze(ctx context.Context, nodes []USN, cfg ProjectConfig) ([]Violation, error)
 }
 
 type accessibilityAnalyzer struct{}
@@ -45,8 +45,23 @@ func NewAnalyzer() Analyzer {
 	return &accessibilityAnalyzer{}
 }
 
-func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Violation, error) {
+func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg ProjectConfig) ([]Violation, error) {
 	var violations []Violation
+
+	// Internal helper to add violations based on project config
+	add := func(v Violation) {
+		ruleCfg, found := cfg.Rules[v.ErrorCode]
+		if found {
+			if !ruleCfg.Enabled {
+				return
+			}
+			if ruleCfg.Severity != "" {
+				v.Severity = ruleCfg.Severity
+			}
+		}
+		violations = append(violations, v)
+	}
+
 	usedIDs := make(map[string]bool)
 	labelsByFor := make(map[string]string)
 	lastHeadingLevel := 0
@@ -91,7 +106,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 				msg = "Gaming texture/sprite missing accessibility label."
 			}
 
-			violations = append(violations, Violation{
+			add(Violation{
 				ErrorCode:        "WCAG_1_1_1",
 				Severity:         SeverityError,
 				Message:          fmt.Sprintf("%s Every image must have an 'alt', 'aria-label', or platform-specific description attribute.", msg),
@@ -117,7 +132,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 				if node.Role == RoleInput {
 					code = "WCAG_3_3_2"
 				}
-				violations = append(violations, Violation{
+				add(Violation{
 					ErrorCode:        code,
 					Severity:         SeverityError,
 					Message:          fmt.Sprintf("%s missing accessible name or label.", node.Role),
@@ -136,7 +151,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 				hasH1 = true
 			}
 			if level > lastHeadingLevel+1 && lastHeadingLevel != 0 {
-				violations = append(violations, Violation{
+				add(Violation{
 					ErrorCode:        "WCAG_1_3_1",
 					Severity:         SeverityError,
 					Message:          fmt.Sprintf("Heading levels should only increase by one. Jumped from H%d to H%d.", lastHeadingLevel, level),
@@ -467,7 +482,29 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 		contextNote := ""
 		if isComponent {
 			severity = SeverityWarning
-			contextNote = " (component file — verify if this is a root document or a nested component)"
+			contextNote = " (component file - verify if this is a root document or a nested component)"
+		}
+
+		// Use source info from the first node if available
+		var firstSource Source
+		if len(nodes) > 0 {
+			// Find the first node that has a real line number (not synthetic)
+			for _, n := range nodes {
+				if n.Source.Line > 0 {
+					firstSource = n.Source
+					break
+				}
+			}
+			// Fallback to first node if none have lines (unlikely but safe)
+			if firstSource.Line == 0 {
+				firstSource = nodes[0].Source
+			}
+		}
+		
+		// If still 0, default to 1
+		if firstSource.Line == 0 {
+			firstSource.Line = 1
+			firstSource.Column = 1
 		}
 
 		if !hasLang {
@@ -475,6 +512,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 				ErrorCode:        "WCAG_3_1_1",
 				Severity:         severity,
 				Message:          "Document missing language attribute." + contextNote,
+				SourceRef:        firstSource,
 				DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/html/H57",
 			})
 		}
@@ -483,6 +521,7 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN) ([]Vio
 				ErrorCode:        "G141",
 				Severity:         severity,
 				Message:          "Page missing an H1 heading." + contextNote,
+				SourceRef:        firstSource,
 				DocumentationURL: "https://www.w3.org/WAI/WCAG22/Techniques/general/G141",
 			})
 		}

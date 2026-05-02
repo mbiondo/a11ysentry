@@ -19,7 +19,8 @@ func NewAndroidAdapter() ports.Adapter {
 	return &androidAdapter{}
 }
 
-func (a *androidAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *androidAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
 	nodeChan := make(chan []domain.USN, len(files))
 	errChan := make(chan error, len(files))
@@ -59,6 +60,17 @@ func (a *androidAdapter) Ingest(ctx context.Context, files []string) ([]domain.U
 	}
 
 	return allNodes, nil
+}
+
+func (a *androidAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 func (a *androidAdapter) parseCompose(content string, filename string) []domain.USN {

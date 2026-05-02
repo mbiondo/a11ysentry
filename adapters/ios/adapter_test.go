@@ -28,7 +28,7 @@ struct Test: View {
 		t.Fatal(err)
 	}
 
-	nodes, err := adapter.Ingest(context.Background(), []string{tmpfile.Name()})
+	nodes, err := adapter.Ingest(context.Background(), &domain.FileNode{FilePath: tmpfile.Name()})
 	if err != nil {
 		t.Fatal(err)
 	}

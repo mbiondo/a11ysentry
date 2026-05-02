@@ -19,29 +19,57 @@ func NewJavaDesktopAdapter() ports.Adapter {
 	return &javaDesktopAdapter{}
 }
 
-func (a *javaDesktopAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *javaDesktopAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			ext := filepath.Ext(f)
+			var nodes []domain.USN
+
+			switch ext {
+			case ".fxml":
+				nodes = a.parseFXML(string(content), f)
+			case ".java":
+				nodes = a.parseJavaSwing(string(content), f)
+			}
+
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
 			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-
-		ext := filepath.Ext(file)
-		var nodes []domain.USN
-
-		switch ext {
-		case ".fxml":
-			nodes = a.parseFXML(string(content), file)
-		case ".java":
-			nodes = a.parseJavaSwing(string(content), file)
-		}
-		
-		allNodes = append(allNodes, nodes...)
 	}
 
 	return allNodes, nil
+}
+
+func (a *javaDesktopAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 func (a *javaDesktopAdapter) parseFXML(content string, filename string) []domain.USN {

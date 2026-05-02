@@ -1,18 +1,18 @@
 {
-  "version": "1.0",
-  "paths": [
-    "src",
-    "app",
-    "pages",
-    "components"
-  ],
   "exclude": [
     "node_modules",
     ".git",
     "examples",
     "landing"
   ],
-  "format": "sarif",
   "exitOnWarning": false,
-  "platform": ""
+  "format": "text",
+  "paths": [
+    "src",
+    "app",
+    "pages",
+    "components"
+  ],
+  "platform": "",
+  "version": "1.0"
 }

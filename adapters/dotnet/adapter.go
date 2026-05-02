@@ -19,29 +19,57 @@ func NewDotNetAdapter() ports.Adapter {
 	return &dotNetAdapter{}
 }
 
-func (a *dotNetAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *dotNetAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			ext := filepath.Ext(f)
+			var nodes []domain.USN
+
+			switch ext {
+			case ".xaml":
+				nodes = a.parseXAML(string(content), f)
+			case ".cs":
+				nodes = a.parseCSharp(string(content), f)
+			}
+
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
 			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-
-		ext := filepath.Ext(file)
-		var nodes []domain.USN
-
-		switch ext {
-		case ".xaml":
-			nodes = a.parseXAML(string(content), file)
-		case ".cs":
-			nodes = a.parseCSharp(string(content), file)
-		}
-		
-		allNodes = append(allNodes, nodes...)
 	}
 
 	return allNodes, nil
+}
+
+func (a *dotNetAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 func (a *dotNetAdapter) parseXAML(content string, filename string) []domain.USN {

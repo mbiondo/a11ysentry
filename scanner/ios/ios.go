@@ -1,18 +1,17 @@
 package ios
 
 import (
+	"a11ysentry/engine/core/domain"
+	"a11ysentry/scanner"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"a11ysentry/scanner"
 )
 
 // Framework implements scanner.ProjectFramework for iOS projects.
 type Framework struct{}
 
-// New returns a new iOS framework scanner.
 func New() *Framework { return &Framework{} }
 
 func (f *Framework) Name() string { return "iOS (Swift/SwiftUI)" }
@@ -73,10 +72,15 @@ func (f *Framework) BuildPageTrees(
 		return nil
 	}
 
+	root := &domain.FileNode{FilePath: projectRoot}
+	for _, f := range allFiles {
+		root.Children = append(root.Children, &domain.FileNode{FilePath: f})
+	}
+
 	return []scanner.PageTree{
 		{
 			Label: "iOS App",
-			Files: allFiles,
+			Root:  root,
 		},
 	}
 }

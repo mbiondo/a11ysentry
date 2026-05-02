@@ -52,46 +52,75 @@ func NewTauriAdapter() ports.Adapter {
 	}
 }
 
-func (a *htmlAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
-	var allNodes []domain.USN
-	nodeChan := make(chan []domain.USN, len(files))
-	errChan := make(chan error, len(files))
+func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	if root == nil {
+		return nil, nil
+	}
+	// Initial ingestion starts with no inherited context.
+	return a.ingestRecursive(ctx, root, "", "")
+}
 
-	for _, file := range files {
-		go func(f string) {
-			content, err := os.ReadFile(f)
-			if err != nil {
-				errChan <- err
-				return
-			}
+func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string) ([]domain.USN, error) {
+	data, err := os.ReadFile(node.FilePath)
+	if err != nil {
+		return nil, err
+	}
+	content := string(data)
 
-			// Detect if this file is a full HTML document or a partial component.
-			// golang.org/x/net/html always wraps fragments in <html>, so we check raw content.
-			isComponent := !strings.Contains(strings.ToLower(string(content)), "<html")
-
-			doc, err := html.Parse(bytes.NewReader(content))
-			if err != nil {
-				errChan <- err
-				return
-			}
-
-			// Pass 1: Extract CSS
-			a.extractCSS(doc)
-
-			nodes := a.traverse(doc, f, nil, string(content), isComponent, "", "")
-			nodeChan <- nodes
-		}(file)
+	// Strip Astro/Markdown frontmatter (--- ... ---)
+	// We replace it with newlines to preserve line numbers.
+	cleanContent := content
+	if strings.HasPrefix(content, "---") {
+		endIdx := strings.Index(content[3:], "---")
+		if endIdx != -1 {
+			frontmatter := content[:endIdx+6]
+			newlines := strings.Repeat("\n", strings.Count(frontmatter, "\n"))
+			cleanContent = newlines + content[endIdx+6:]
+		}
 	}
 
-	for i := 0; i < len(files); i++ {
-		select {
-		case nodes := <-nodeChan:
-			allNodes = append(allNodes, nodes...)
-		case err := <-errChan:
-			return nil, err
-		case <-ctx.Done():
-			return nil, ctx.Err()
+	// Detect if this file is a full HTML document or a partial component.
+	// If it's a Page Tree root, we should NOT treat it as a component.
+	isComponent := !strings.Contains(strings.ToLower(cleanContent), "<html")
+	if inheritedBG == "" && inheritedFG == "" {
+		// Heuristic: if no context inherited, it's likely a root document.
+		isComponent = false
+	}
+
+	doc, err := html.Parse(strings.NewReader(cleanContent))
+	if err != nil {
+		return nil, err
+	}
+
+	// Pass 1: Extract CSS from this file
+	a.extractCSS(doc)
+
+	// Pass 2: Traverse this file with inherited context from parent file
+	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG)
+
+	// Determine the effective background and foreground to propagate to children files.
+	// We look for the most specific colors defined in the current file.
+	childBG := inheritedBG
+	childFG := inheritedFG
+	for _, n := range nodes {
+		if bg, ok := n.Traits["background-color"].(string); ok && bg != "" {
+			childBG = bg
 		}
+		if fg, ok := n.Traits["color"].(string); ok && fg != "" {
+			childFG = fg
+		}
+	}
+
+	var allNodes []domain.USN
+	allNodes = append(allNodes, nodes...)
+
+	// Recursively ingest children (imported components or nested layouts)
+	for _, child := range node.Children {
+		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG)
+		if err != nil {
+			return nil, err
+		}
+		allNodes = append(allNodes, childNodes...)
 	}
 
 	return allNodes, nil
@@ -146,7 +175,7 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 
 	if n.Type == html.ElementNode {
 		raw := a.renderNode(n)
-		line, col := a.findPosition(raw, fullContent)
+		line, col := a.findPosition(n, fullContent)
 
 		usn := domain.USN{
 			UID:    a.getAttribute(n, "id"),
@@ -405,8 +434,48 @@ func (a *htmlAdapter) renderNode(n *html.Node) string {
 	return buf.String()
 }
 
-func (a *htmlAdapter) findPosition(raw string, fullContent string) (int, int) {
+func (a *htmlAdapter) findPosition(n *html.Node, fullContent string) (int, int) {
+	// Attempt to find the tag in the source more robustly.
+	// 1. Try exact match of a reconstructed start tag (best effort).
+	raw := a.renderNode(n)
 	idx := strings.Index(fullContent, raw)
+	
+	// 2. If exact match fails, try a fuzzy match based on tag name and key attributes.
+	if idx == -1 {
+		tagName := n.Data
+		var patterns []string
+		patterns = append(patterns, "<"+tagName)
+		
+		// Add some attributes to the search pattern if available
+		for _, attr := range n.Attr {
+			// Skip attributes that might be transformed or are too common
+			if attr.Key == "class" || attr.Key == "id" || attr.Key == "src" || attr.Key == "href" {
+				val := regexp.QuoteMeta(attr.Val)
+				patterns = append(patterns, fmt.Sprintf("%s\\s*=\\s*['\"]%s['\"]", attr.Key, val))
+			}
+		}
+		
+		// Build a regex that matches the tag name and at least one identifying attribute
+		if len(patterns) > 1 {
+			for i := 1; i < len(patterns); i++ {
+				rePattern := "(?i)" + patterns[0] + "[^>]*" + patterns[i]
+				re, err := regexp.Compile(rePattern)
+				if err == nil {
+					loc := re.FindStringIndex(fullContent)
+					if loc != nil {
+						idx = loc[0]
+						break
+					}
+				}
+			}
+		}
+		
+		// 3. Fallback to just the first occurrence of the tag name if still not found
+		if idx == -1 {
+			idx = strings.Index(fullContent, "<"+tagName)
+		}
+	}
+
 	if idx == -1 {
 		return 0, 0
 	}

@@ -107,22 +107,25 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 		importGraph := scanner.BuildImportGraph(uiFiles, fw, root)
 		trees := fw.BuildPageTrees(uiFiles, importGraph, root)
 
+		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
+
 		for _, tree := range trees {
-			adapter, _ := getAdapterAndPlatform(tree.Files[0], fw.Name())
+			adapter, _ := getAdapterAndPlatform(tree.Root.FilePath, fw.Name())
 			if adapter == nil {
 				continue
 			}
 
 			// Pre-load project CSS for color resolution (no-op if not a web adapter)
-			web.LoadProjectCSS(adapter, append(cssFiles, tree.Files...))
+			allFiles := tree.Root.Flatten()
+			web.LoadProjectCSS(adapter, append(cssFiles, allFiles...))
 
-			nodes, err := adapter.Ingest(ctx, tree.Files)
+			nodes, err := adapter.Ingest(ctx, tree.Root)
 			if err != nil {
 				log.Printf("Error ingesting tree %s: %v", tree.Label, err)
 				continue
 			}
 
-			violations, _ := domain.NewAnalyzer().Analyze(ctx, nodes)
+			violations, _ := domain.NewAnalyzer().Analyze(ctx, nodes, cfg)
 			allViolations = append(allViolations, violations...)
 		}
 	}
@@ -147,7 +150,8 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 		}
 
 		// 2. Ingest Source
-		nodes, err := adapter.Ingest(ctx, []string{p})
+		rootNode := &domain.FileNode{FilePath: p}
+		nodes, err := adapter.Ingest(ctx, rootNode)
 		if err != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("Error reading file %s: %v", p, err)), nil
 		}
@@ -159,9 +163,10 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 	}
 
 	analyzer := domain.NewAnalyzer()
+	cfg, _ := domain.LoadConfig("a11ysentry.json")
 
 	// 3. Perform Analysis on the combined tree
-	violations, err := analyzer.Analyze(ctx, allNodes)
+	violations, err := analyzer.Analyze(ctx, allNodes, cfg)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Analysis failed: %v", err)), nil
 	}

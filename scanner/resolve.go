@@ -1,163 +1,132 @@
 package scanner
 
 import (
+	"a11ysentry/engine/core/domain"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 // UIExtensions is the set of file extensions that contain UI markup.
 var UIExtensions = map[string]bool{
-	".html": true, ".htm": true,
+	".html":   true,
+	".htm":    true,
 	".astro":  true,
 	".vue":    true,
 	".svelte": true,
 	".tsx":    true,
 	".jsx":    true,
-	// Android
-	".xml":  true,
-	".kt":   true,
-	".java": true,
-	// iOS
-	".swift":      true,
-	".storyboard": true,
-	".xib":        true,
+	".razor":  true, // Blazor
+	".kt":     true, // Android Compose
+	".xml":    true, // Android Views / Layouts
+	".dart":   true, // Flutter
+	".swift":  true, // iOS SwiftUI / UIKit
+	".xaml":   true, // .NET MAUI / WPF
+	".cs":     true, // .NET code-behind
+	".fxml":   true, // JavaFX
+	".java":   true, // Java Swing / Android
 }
 
-// CSSExtensions is the set of file extensions treated as stylesheets.
+// CSSExtensions is the set of file extensions that contain CSS/SCSS.
 var CSSExtensions = map[string]bool{
-	".css": true, ".scss": true,
+	".css":  true,
+	".scss": true,
+	".sass": true,
+	".less": true,
 }
 
-// SkipDirs is the set of directory names to skip during filesystem walks.
-var SkipDirs = map[string]bool{
-	"node_modules": true,
-	".git":         true,
-	"dist":         true,
-	"build":        true,
-	"out":          true,
-	".astro":       true,
-	".next":        true,
-	".nuxt":        true,
-	".svelte-kit":  true,
-	// Android / Mobile
-	".gradle":     true,
-	".idea":       true,
-	"DerivedData": true,
-	".build":      true,
-}
+var (
+	importRe        = regexp.MustCompile(`(?m)import\s+(?:(?:[\w*\s{},]*)\s+from\s+)?['"]([^'"]+)['"]`)
+	dynamicImportRe = regexp.MustCompile(`import\s*\(['"]([^'"]+)['"]\)`)
+)
 
-// importRe matches ES module static imports and re-exports.
-var importRe = regexp.MustCompile(`(?m)(?:import|export)\s+(?:[^'"` + "`" + `\n]+\s+from\s+)?['"]([^'"` + "`" + `]+)['"]`)
-
-// dynamicImportRe matches dynamic imports: import('...')
-var dynamicImportRe = regexp.MustCompile(`(?m)import\(\s*['"]([^'"]+)['"]\s*\)`)
-
-// kotlinImportRe matches Kotlin/Java imports: import com.example.MyComponent
-var kotlinImportRe = regexp.MustCompile(`(?m)^import\s+([a-zA-Z0-9._]+)`)
-
-// swiftImportRe matches Swift imports: import MyModule
-var swiftImportRe = regexp.MustCompile(`(?m)^import\s+([a-zA-Z0-9_]+)`)
-
-// ResolveImports returns the absolute paths of project-local files imported by
-// filePath. It automatically detects the language based on file extension.
-func ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	data, err := os.ReadFile(filePath)
+// ResolveImports returns the absolute paths of project-local files imported
+// by filePath. External packages (node_modules) are ignored.
+func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool) []string {
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil
 	}
+	src := string(content)
 
-	ext := strings.ToLower(filepath.Ext(filePath))
-	src := string(data)
 	var resolved []string
-	seen := make(map[string]bool)
+	
+	// Fast case-insensitive lookup map for Windows
+	lowerFileSet := make(map[string]string)
+	for f := range fileSet {
+		lowerFileSet[strings.ToLower(f)] = f
+	}
 
 	add := func(p string) {
-		if !seen[p] {
-			seen[p] = true
-			resolved = append(resolved, p)
+		p = filepath.Clean(p)
+		if realPath, ok := lowerFileSet[strings.ToLower(p)]; ok {
+			resolved = append(resolved, realPath)
 		}
 	}
 
-	switch ext {
-	case ".kt", ".java":
-		// Kotlin/Java imports are tricky because they use package names.
-		// For now, we do a simple heuristic: if a file in the fileSet
-		// matches the end of the import path, we include it.
-		// In a real Android project, we'd need to map package names to directories.
-		for _, m := range kotlinImportRe.FindAllStringSubmatch(src, -1) {
-			importPath := m[1]
-			parts := strings.Split(importPath, ".")
-			className := parts[len(parts)-1]
+	// Default: Generic resolution (Regex-based)
+	base := filepath.Dir(filePath)
+	aliases := LoadTSConfigPaths(projectRoot)
 
-			// Look for files that end with /ClassName.kt or /ClassName.java
-			for f := range fileSet {
-				base := filepath.Base(f)
-				if strings.HasPrefix(base, className+".") {
-					add(f)
-				}
+	tryResolve := func(importPath string) {
+		var abs string
+		if strings.HasPrefix(importPath, "/") {
+			// Web convention: / is project root. 
+			// On Windows, filepath.Join with leading slash can be tricky, 
+			// so we trim it to ensure it's treated as project-relative.
+			abs = filepath.Join(projectRoot, strings.TrimPrefix(importPath, "/"))
+		} else if strings.HasPrefix(importPath, ".") {
+			abs = filepath.Join(base, importPath)
+		} else {
+			if p := resolveAlias(importPath, aliases, projectRoot, fileSet); p != "" {
+				// resolveAlias should return the correctly cased path from fileSet
+				resolved = append(resolved, p)
+			}
+			return
+		}
+
+		// Try the path as is
+		add(abs)
+
+		// Try with UI extensions if not found
+		lowerAbs := strings.ToLower(filepath.Clean(abs))
+		if _, ok := lowerFileSet[lowerAbs]; !ok {
+			for uiExt := range UIExtensions {
+				add(abs + uiExt)
+			}
+			// Also try with .ts/.js for utility resolution
+			for _, ext := range []string{".ts", ".js", ".tsx", ".jsx"} {
+				add(abs + ext)
 			}
 		}
+	}
 
-	case ".swift":
-		for _, m := range swiftImportRe.FindAllStringSubmatch(src, -1) {
-			moduleName := m[1]
-			// Similar heuristic for Swift.
-			for f := range fileSet {
-				if strings.Contains(f, "/"+moduleName+"/") || filepath.Base(f) == moduleName+".swift" {
-					add(f)
-				}
-			}
-		}
-
-	default:
-		// JS/TS/Web fallback
-		aliases := LoadTSConfigPaths(projectRoot)
-		base := filepath.Dir(filePath)
-
-		tryResolve := func(importPath string) {
-			if strings.HasPrefix(importPath, ".") || strings.HasPrefix(importPath, "/") {
-				abs := filepath.Clean(filepath.Join(base, importPath))
-				if fileSet[abs] {
-					add(abs)
-					return
-				}
-				for uiExt := range UIExtensions {
-					if fileSet[abs+uiExt] {
-						add(abs + uiExt)
-						return
-					}
-				}
-			} else {
-				if p := resolveAlias(importPath, aliases, projectRoot, fileSet); p != "" {
-					add(p)
-				}
-			}
-		}
-
-		for _, m := range importRe.FindAllStringSubmatch(src, -1) {
-			tryResolve(m[1])
-		}
-		for _, m := range dynamicImportRe.FindAllStringSubmatch(src, -1) {
-			tryResolve(m[1])
-		}
+	for _, m := range importRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
+	for _, m := range dynamicImportRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
 	}
 
 	return resolved
 }
 
-// CollectTree returns the full transitive closure of root's import graph.
-func CollectTree(root string, graph map[string][]string, visited map[string]bool) []string {
-	if visited[root] {
+// CollectTree returns the full transitive closure of root's import graph as a tree.
+func CollectTree(rootPath string, graph map[string][]string, visited map[string]bool) *domain.FileNode {
+	if visited[rootPath] {
 		return nil
 	}
-	visited[root] = true
-	result := []string{root}
-	for _, dep := range graph[root] {
-		result = append(result, CollectTree(dep, graph, visited)...)
+	visited[rootPath] = true
+	node := &domain.FileNode{FilePath: rootPath}
+	for _, dep := range graph[rootPath] {
+		child := CollectTree(dep, graph, visited)
+		if child != nil {
+			node.Children = append(node.Children, child)
+		}
 	}
-	return result
+	return node
 }
 
 // BuildFileSet builds a fast-lookup set from a list of absolute paths.
@@ -173,9 +142,21 @@ func BuildFileSet(files []string) map[string]bool {
 func BuildImportGraph(allFiles []string, fw ProjectFramework, projectRoot string) map[string][]string {
 	fileSet := BuildFileSet(allFiles)
 	graph := make(map[string][]string, len(allFiles))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
 	for _, f := range allFiles {
-		graph[f] = fw.ResolveImports(f, projectRoot, fileSet)
+		wg.Add(1)
+		go func(file string) {
+			defer wg.Done()
+			deps := fw.ResolveImports(file, projectRoot, fileSet)
+			mu.Lock()
+			graph[file] = deps
+			mu.Unlock()
+		}(f)
 	}
+
+	wg.Wait()
 	return graph
 }
 
@@ -233,7 +214,12 @@ func resolveAlias(importPath string, aliases *TSConfigPaths, projectRoot string,
 			if fileSet[candidate] {
 				return candidate
 			}
-			for ext := range UIExtensions {
+			for uiExt := range UIExtensions {
+				if fileSet[candidate+uiExt] {
+					return candidate + uiExt
+				}
+			}
+			for _, ext := range []string{".ts", ".js", ".tsx", ".jsx"} {
 				if fileSet[candidate+ext] {
 					return candidate + ext
 				}

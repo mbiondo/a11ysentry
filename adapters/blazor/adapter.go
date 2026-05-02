@@ -18,25 +18,54 @@ func NewBlazorAdapter() ports.Adapter {
 	return &blazorAdapter{}
 }
 
-func (a *blazorAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *blazorAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			doc, err := html.Parse(bytes.NewReader(content))
+			if err != nil {
+				errChan <- err
+				return
+			}
+
+			nodes := a.traverse(doc, f, string(content))
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
 			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-
-		doc, err := html.Parse(bytes.NewReader(content))
-		if err != nil {
-			continue
-		}
-
-		nodes := a.traverse(doc, file, string(content))
-		allNodes = append(allNodes, nodes...)
 	}
 
 	return allNodes, nil
+}
+
+func (a *blazorAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 func (a *blazorAdapter) traverse(n *html.Node, filename string, fullContent string) []domain.USN {

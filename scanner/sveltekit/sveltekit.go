@@ -10,11 +10,11 @@
 package sveltekit
 
 import (
+	"a11ysentry/engine/core/domain"
+	"a11ysentry/scanner"
 	"io/fs"
 	"path/filepath"
 	"strings"
-
-	"a11ysentry/scanner"
 )
 
 // Framework is the SvelteKit project framework.
@@ -91,28 +91,39 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 			continue
 		}
 
-		chain := layoutChain(filepath.Dir(file), routesDir, layoutByDir)
-		closure := scanner.CollectTree(file, importGraph, make(map[string]bool))
+		visited := make(map[string]bool)
+		var root *domain.FileNode
+		var current *domain.FileNode
 
-		// Merge: chain first, then page closure (dedup).
-		seen := make(map[string]bool)
-		var files []string
-		for _, l := range chain {
-			if !seen[l] {
-				seen[l] = true
-				files = append(files, l)
+		chain := layoutChain(filepath.Dir(file), routesDir, layoutByDir)
+
+		// Stitch layout chain: outermost first.
+		for _, layout := range chain {
+			layoutNode := scanner.CollectTree(layout, importGraph, visited)
+			if layoutNode == nil {
+				continue
 			}
+			if root == nil {
+				root = layoutNode
+			} else {
+				current.Children = append(current.Children, layoutNode)
+			}
+			current = layoutNode
 		}
-		for _, c := range closure {
-			if !seen[c] {
-				seen[c] = true
-				files = append(files, c)
+
+		// Add page at the end of the layout chain.
+		pageNode := scanner.CollectTree(file, importGraph, visited)
+		if pageNode != nil {
+			if root == nil {
+				root = pageNode
+			} else {
+				current.Children = append(current.Children, pageNode)
 			}
 		}
 
 		trees = append(trees, scanner.PageTree{
 			Label: filepath.ToSlash(rel),
-			Files: files,
+			Root:  root,
 		})
 	}
 

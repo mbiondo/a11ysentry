@@ -5,9 +5,11 @@
 package scanner
 
 import (
+	"a11ysentry/engine/core/domain"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 // ProjectMarkers is the set of filenames that identify a project root.
@@ -24,6 +26,17 @@ var ProjectMarkers = []string{
 var ProjectDirExtensions = []string{
 	".xcodeproj",    // iOS
 	".xcworkspace",  // iOS
+}
+
+// SkipDirs is a set of directories to always skip during project discovery.
+var SkipDirs = map[string]bool{
+	"node_modules": true,
+	".git":         true,
+	"dist":         true,
+	"build":        true,
+	".next":        true,
+	".astro":       true,
+	"vendor":       true,
 }
 
 // isProjectRoot returns true if dir contains any of the known project markers.
@@ -71,7 +84,44 @@ func FindProjectRoots(dir string, excludes ...string) []string {
 	if isProjectRoot(abs) {
 		return []string{abs}
 	}
-	return collectRoots(abs, excludeMap)
+
+	entries, err := os.ReadDir(abs)
+	if err != nil {
+		return nil
+	}
+
+	var roots []string
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if SkipDirs[entry.Name()] || excludeMap[entry.Name()] {
+			continue
+		}
+
+		sub := filepath.Join(abs, entry.Name())
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			var found []string
+			if isProjectRoot(path) {
+				found = []string{path}
+			} else {
+				found = collectRoots(path, excludeMap)
+			}
+			if len(found) > 0 {
+				mu.Lock()
+				roots = append(roots, found...)
+				mu.Unlock()
+			}
+		}(sub)
+	}
+
+	wg.Wait()
+	return roots
 }
 
 // collectRoots is the recursive implementation of FindProjectRoots.
@@ -100,7 +150,6 @@ func collectRoots(dir string, excludeMap map[string]bool) []string {
 	return roots
 }
 
-
 // PageTree is a single analysis unit: an ordered set of files that form a
 // complete rendering context for one route or view.
 //
@@ -110,8 +159,8 @@ func collectRoots(dir string, excludeMap map[string]bool) []string {
 type PageTree struct {
 	// Label is a human-readable identifier (e.g. "app/(app)/admin/page.tsx").
 	Label string
-	// Files holds the ordered list of absolute paths to analyze together.
-	Files []string
+	// Root is the entry point of the hierarchical analysis tree.
+	Root *domain.FileNode
 }
 
 // ProjectFramework knows how to decompose a specific frontend framework's

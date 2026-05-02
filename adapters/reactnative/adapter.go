@@ -16,23 +16,51 @@ func NewReactNativeAdapter() ports.Adapter {
 	return &reactNativeAdapter{}
 }
 
-func (a *reactNativeAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *reactNativeAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-		nodes := a.parseJS(string(content), file)
-		allNodes = append(allNodes, nodes...)
+			nodes := a.parseReactNative(string(content), f)
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
+			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	return allNodes, nil
 }
 
-func (a *reactNativeAdapter) parseJS(content string, filename string) []domain.USN {
+func (a *reactNativeAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
+}
+
+func (a *reactNativeAdapter) parseReactNative(content string, filename string) []domain.USN {
 	var nodes []domain.USN
 	lines := strings.Split(content, "\n")
 

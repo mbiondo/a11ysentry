@@ -36,6 +36,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -73,6 +74,24 @@ func main() {
 	watchFlag := flag.Bool("watch", false, "Watch input files for changes and re-analyze automatically")
 	flag.Parse()
 
+	// Load configuration
+	configPath := "a11ysentry.json"
+	cfg, err := domain.LoadConfig(configPath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("Warning: error loading config file: %v", err)
+	}
+
+	// Merge flags with config (Flags take precedence if explicitly set)
+	if *formatFlag != "text" {
+		cfg.Format = *formatFlag
+	}
+	if *platformFlag != "" {
+		cfg.Platform = *platformFlag
+	}
+	if *excludeFlag != "" {
+		cfg.Exclude = append(cfg.Exclude, strings.Split(*excludeFlag, ",")...)
+	}
+
 	homeDir, _ := os.UserHomeDir()
 	dbDir := filepath.Join(homeDir, ".a11ysentry")
 	_ = os.MkdirAll(dbDir, 0755)
@@ -81,14 +100,7 @@ func main() {
 		log.Fatalf("Error initializing database: %v", err)
 	}
 
-	var excludes []string
-	if *excludeFlag != "" {
-		for _, e := range strings.Split(*excludeFlag, ",") {
-			if e = strings.TrimSpace(e); e != "" {
-				excludes = append(excludes, e)
-			}
-		}
-	}
+	projectRoot, _ := detectProjectRoot()
 
 	if *tuiFlag {
 		m := tui.NewMainModel(repo)
@@ -101,7 +113,7 @@ func main() {
 
 	// --dir: project-aware analysis delegated entirely to the scanner.
 	if *dirFlag != "" {
-		runProjectAnalysis(*dirFlag, *formatFlag, excludes, repo)
+		runProjectAnalysis(*dirFlag, cfg, repo)
 		return
 	}
 
@@ -114,7 +126,7 @@ func main() {
 	// Auto-detect: if the single positional arg is a directory, delegate to project analysis.
 	if len(args) == 1 {
 		if info, err := os.Stat(args[0]); err == nil && info.IsDir() {
-			runProjectAnalysis(args[0], *formatFlag, excludes, repo)
+			runProjectAnalysis(args[0], cfg, repo)
 			return
 		}
 	}
@@ -129,12 +141,12 @@ func main() {
 	}
 
 	if *watchFlag {
-		runWatch(args, *formatFlag, *platformFlag, extraCSS, repo)
+		runWatch(args, cfg, extraCSS, repo, projectRoot)
 		return
 	}
 
-	allReports, hasErrors, hasWarnings := analyzeFiles(args, *formatFlag, *platformFlag, extraCSS, repo)
-	printReports(allReports, *formatFlag)
+	allReports, hasErrors, hasWarnings := analyzeFiles(args, cfg, extraCSS, repo)
+	printReports(allReports, cfg.Format, projectRoot)
 
 	if hasErrors {
 		os.Exit(1)
@@ -147,7 +159,7 @@ func main() {
 // Project-aware analysis (--dir flag) — delegates to scanner package
 // ─────────────────────────────────────────────────────────────────────────────
 
-func runProjectAnalysis(dir, format string, excludes []string, repo ports.Repository) {
+func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Repository) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Could not resolve directory: %v\n", err)
@@ -155,12 +167,12 @@ func runProjectAnalysis(dir, format string, excludes []string, repo ports.Reposi
 	}
 
 	// Discover project roots (handles monorepos / multi-project directories).
-	roots := scanner.FindProjectRoots(absDir, excludes...)
+	roots := scanner.FindProjectRoots(absDir, cfg.Exclude...)
 	if len(roots) == 0 {
 		fmt.Fprintf(os.Stderr, "No supported project roots found in %s\n", absDir)
 		os.Exit(1)
 	}
-	if len(roots) > 1 && format == "text" {
+	if len(roots) > 1 && cfg.Format == "text" {
 		fmt.Printf("A11ySentry -- Found %d project(s) in %s\n\n", len(roots), absDir)
 	}
 
@@ -168,7 +180,7 @@ func runProjectAnalysis(dir, format string, excludes []string, repo ports.Reposi
 	hasErrors, hasWarnings := false, false
 
 	for _, root := range roots {
-		errs, warns, reports := analyzeProject(root, format, repo)
+		errs, warns, reports := analyzeProject(root, cfg, repo)
 		allReports = append(allReports, reports...)
 		if errs {
 			hasErrors = true
@@ -178,8 +190,8 @@ func runProjectAnalysis(dir, format string, excludes []string, repo ports.Reposi
 		}
 	}
 
-	if format != "text" {
-		printReports(allReports, format)
+	if cfg.Format != "text" {
+		printReports(allReports, cfg.Format, absDir)
 	}
 
 	if hasErrors {
@@ -189,7 +201,7 @@ func runProjectAnalysis(dir, format string, excludes []string, repo ports.Reposi
 	}
 }
 
-func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport) {
+func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport) {
 	// 1. Detect framework and collect files.
 	fw := scanner.Detect(absDir,
 		nextjs.New(),
@@ -201,17 +213,17 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 		generic.New(),
 	)
 
-	if format == "text" {
+	if cfg.Format == "text" {
 		fmt.Printf("A11ySentry -- Project: %s [%s]\n\n", absDir, fw.Name())
 	}
 
-	uiFiles, _, err := fw.CollectFiles(absDir)
+	uiFiles, cssFiles, err := fw.CollectFiles(absDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 		return
 	}
 	if len(uiFiles) == 0 {
-		if format == "text" {
+		if cfg.Format == "text" {
 			fmt.Printf("  No supported UI files found — skipping.\n\n")
 		}
 		return
@@ -223,46 +235,63 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 	// 3. Build page trees (framework-specific).
 	trees := fw.BuildPageTrees(uiFiles, importGraph, absDir)
 
-	if format == "text" {
+	if cfg.Format == "text" {
 		fmt.Printf("  Found %d files, %d page tree(s)\n\n", len(uiFiles), len(trees))
 	}
 
 	// 4. Analyze each tree as a unit.
-	for _, tree := range trees {
-		if format == "text" {
-			fmt.Printf("  Page: %s\n", tree.Label)
-			for _, f := range tree.Files[1:] {
-				fmt.Printf("     |-- %s\n", shortPath(f, absDir))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, t := range trees {
+		wg.Add(1)
+		go func(tree scanner.PageTree) {
+			defer wg.Done()
+
+			// Output label only in text format (note: concurrent output might be jumbled, 
+			// but we use mu to protect shared slices/persistence)
+			if cfg.Format == "text" {
+				mu.Lock()
+				fmt.Printf("  Page: %s\n", tree.Label)
+				printTree(tree.Root, absDir, 1)
+				mu.Unlock()
 			}
-		}
 
-		// Choose the right adapter and platform based on the framework.
-		var adapter ports.Adapter
-		platform := domain.PlatformWebReact
+			// Choose the right adapter and platform based on the framework.
+			var adapter ports.Adapter
+			platform := domain.PlatformWebReact
 
-		switch fw.Name() {
-		case "Android":
-			adapter = android.NewAndroidAdapter()
-			platform = domain.PlatformAndroidCompose
-		case "iOS":
-			adapter = ios.NewIOSAdapter()
-			platform = domain.PlatformIOSSwiftUI
-		default:
-			adapter = web.NewHTMLAdapter()
-		}
+			switch fw.Name() {
+			case "Android (Kotlin/Java)":
+				adapter = android.NewAndroidAdapter()
+				platform = domain.PlatformAndroidCompose
+			case "iOS (Swift/SwiftUI)":
+				adapter = ios.NewIOSAdapter()
+				platform = domain.PlatformIOSSwiftUI
+			default:
+				adapter = web.NewHTMLAdapter()
+			}
 
-		analyzer := domain.NewAnalyzer()
-		for _, f := range tree.Files {
-			usns, err := adapter.Ingest(context.Background(), []string{f})
+			// Pre-load CSS from the whole tree for web frameworks.
+			if fw.Name() != "Android (Kotlin/Java)" && fw.Name() != "iOS (Swift/SwiftUI)" {
+				allFiles := tree.Root.Flatten()
+				web.LoadProjectCSS(adapter, append(cssFiles, allFiles...))
+			}
+
+			// Ingest the entire tree as a single analysis unit.
+			usns, err := adapter.Ingest(context.Background(), tree.Root)
 			if err != nil {
-				continue
+				return
 			}
-			violations, err := analyzer.Analyze(context.Background(), usns)
+
+			analyzer := domain.NewAnalyzer()
+			violations, err := analyzer.Analyze(context.Background(), usns, cfg)
 			if err != nil {
-				continue
+				return
 			}
+
 			report := domain.ViolationReport{
-				FilePath:   f,
+				FilePath:   tree.Label,
 				Platform:   platform,
 				Violations: violations,
 			}
@@ -270,8 +299,10 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 			// Persistence.
 			_ = repo.SaveReport(context.Background(), report)
 
-			if format == "text" && len(report.Violations) > 0 {
-				fmt.Printf("\n  %s\n%s\n", shortPath(f, absDir), domain.ToTOON(report.Violations))
+			mu.Lock()
+			if cfg.Format == "text" && len(report.Violations) > 0 {
+				fmt.Printf("\nPage: %s\n", tree.Label)
+				fmt.Print(domain.ToESLintStyle(report.Violations, absDir))
 			}
 
 			reports = append(reports, report)
@@ -281,19 +312,33 @@ func analyzeProject(absDir, format string, repo ports.Repository) (hasErrors, ha
 			if reportHasWarnings(report) {
 				hasWarnings = true
 			}
-		}
+			mu.Unlock()
+		}(t)
 	}
+	wg.Wait()
 	return
 }
 
-func analyzeFiles(paths []string, format, platformName string, extraCSS []string, repo ports.Repository) (reports []domain.ViolationReport, hasErrors, hasWarnings bool) {
+func printTree(node *domain.FileNode, base string, indent int) {
+	if node == nil {
+		return
+	}
+	prefix := strings.Repeat("  ", indent)
+	fmt.Printf("%s|-- %s\n", prefix, shortPath(node.FilePath, base))
+	for _, child := range node.Children {
+		printTree(child, base, indent+1)
+	}
+}
+
+
+func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo ports.Repository) (reports []domain.ViolationReport, hasErrors, hasWarnings bool) {
 	// Standard analysis (not project-aware) — falls back to Generic adapter.
 	var adapter ports.Adapter
 	platform := domain.PlatformWebReact
 
 	// Map platform flag to internal domain types.
-	if platformName != "" {
-		switch strings.ToLower(platformName) {
+	if cfg.Platform != "" {
+		switch strings.ToLower(cfg.Platform) {
 		case "android":
 			adapter = android.NewAndroidAdapter()
 			platform = domain.PlatformAndroidCompose
@@ -331,12 +376,13 @@ func analyzeFiles(paths []string, format, platformName string, extraCSS []string
 	analyzer := domain.NewAnalyzer()
 	for _, p := range paths {
 		absPath, _ := filepath.Abs(p)
-		usns, err := adapter.Ingest(context.Background(), []string{absPath})
+		rootNode := &domain.FileNode{FilePath: absPath}
+		usns, err := adapter.Ingest(context.Background(), rootNode)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", p, err)
 			continue
 		}
-		violations, err := analyzer.Analyze(context.Background(), usns)
+		violations, err := analyzer.Analyze(context.Background(), usns, cfg)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error analyzing %s: %v\n", p, err)
 			continue
@@ -377,7 +423,7 @@ func reportHasWarnings(r domain.ViolationReport) bool {
 	return false
 }
 
-func printReports(reports []domain.ViolationReport, format string) {
+func printReports(reports []domain.ViolationReport, format, projectRoot string) {
 	switch format {
 	case "json":
 		data, _ := json.MarshalIndent(reports, "", "  ")
@@ -388,12 +434,15 @@ func printReports(reports []domain.ViolationReport, format string) {
 		fmt.Println(string(data))
 	default:
 		for _, r := range reports {
-			fmt.Printf("%s\n", domain.ToTOON(r.Violations))
+			if len(r.Violations) > 0 {
+				fmt.Printf("\nPage: %s\n", shortPath(r.FilePath, projectRoot))
+				fmt.Print(domain.ToESLintStyle(r.Violations, projectRoot))
+			}
 		}
 	}
 }
 
-func runWatch(paths []string, format, platform string, extraCSS []string, repo ports.Repository) {
+func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo ports.Repository, projectRoot string) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -407,8 +456,8 @@ func runWatch(paths []string, format, platform string, extraCSS []string, repo p
 	fmt.Printf(titleStyle.Render("A11ySentry")+" -- Watching %d file(s) for changes...\n\n", len(paths))
 
 	// Initial run.
-	reports, _, _ := analyzeFiles(paths, format, platform, extraCSS, repo)
-	printReports(reports, format)
+	reports, _, _ := analyzeFiles(paths, cfg, extraCSS, repo)
+	printReports(reports, cfg.Format, projectRoot)
 
 	for {
 		select {
@@ -418,8 +467,8 @@ func runWatch(paths []string, format, platform string, extraCSS []string, repo p
 			}
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				fmt.Printf("\n[%s] File changed: %s\n", time.Now().Format("15:04:05"), event.Name)
-				reports, _, _ := analyzeFiles([]string{event.Name}, format, platform, extraCSS, repo)
-				printReports(reports, format)
+				reports, _, _ := analyzeFiles([]string{event.Name}, cfg, extraCSS, repo)
+				printReports(reports, cfg.Format, projectRoot)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {
@@ -605,19 +654,16 @@ func createConfigFile(root string, force bool) error {
 		fmt.Println("a11ysentry.json already exists, skipping (use --force to overwrite)")
 		return nil
 	}
-	cfg := map[string]any{
-		"version":       "1.0",
-		"paths":         []string{"src", "app", "pages", "components"},
-		"exclude":       []string{"node_modules", ".git", "examples", "landing"},
-		"format":        "sarif",
-		"exitOnWarning": false,
-		"platform":      "",
-	}
+	
+	// Use the domain's default config to ensure consistency
+	cfg := domain.DefaultConfig()
+	cfg.Format = "sarif" // Overriding default for new projects as discussed
+	
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	if err := os.WriteFile(path, data, 0644); err != nil {
 		return fmt.Errorf("writing config: %w", err)
 	}
-	fmt.Println("Created a11ysentry.json")
+	fmt.Println("Created a11ysentry.json with default rules.")
 	return nil
 }
 

@@ -50,6 +50,9 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
+		if ext == ".xml" {
+			return nil
+		}
 		base := strings.ToLower(d.Name())
 
 		if scanner.CSSExtensions[ext] {
@@ -88,15 +91,33 @@ func (f *Framework) BuildPageTrees(
 		}
 	}
 
+	// Identify files in pages directory
+	isPage := make(map[string]bool)
+	hasPagesDir := false
+	for _, file := range allFiles {
+		rel, _ := filepath.Rel(projectRoot, file)
+		slashRel := filepath.ToSlash(rel)
+		if strings.HasPrefix(slashRel, "src/pages") || strings.HasPrefix(slashRel, "pages") {
+			isPage[file] = true
+			hasPagesDir = true
+		}
+	}
+
 	var trees []scanner.PageTree
 	for _, file := range allFiles {
+		// If project has a pages dir, only consider files there as potential roots.
+		// If not, fall back to the "not imported" strategy.
+		if hasPagesDir && !isPage[file] {
+			continue
+		}
+		
 		if importedByAnyone[file] {
 			continue
 		}
-		tree := scanner.CollectTree(file, importGraph, make(map[string]bool))
+		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),
-			Files: tree,
+			Root:  root,
 		})
 	}
 	return trees

@@ -344,19 +344,22 @@ type MainModel struct {
 | Analysis | 1-5ms | <1MB |
 | **Total** | **16-65ms** | **2-7MB** |
 
-### Concurrency Model
+## Concurrency Model
 
-- **File-level parallelism:** Multiple files processed concurrently
-- **Channel-based synchronization:** Results collected via channels
-- **Context cancellation:** Graceful shutdown support
+A11ySentry is designed for maximum efficiency using Go's native concurrency primitives. The pipeline is concurrent at every level:
+
+1.  **Project Discovery (Scanner):** `FindProjectRoots` parallelizes directory traversal to locate projects in large monorepos quickly.
+2.  **Import Resolution:** `BuildImportGraph` resolves file dependencies concurrently, building the project tree in parallel.
+3.  **File Ingestion (Adapters):** All adapters (Web, Mobile, Desktop, Gaming) process file batches concurrently using goroutines and channels.
+4.  **Batch Analysis (CLI):** When analyzing full projects (`--dir`), A11ySentry processes independent "PageTrees" in parallel, utilizing all available CPU cores.
 
 ```go
+// Example of concurrent ingestion used across all adapters
 nodeChan := make(chan []USN, len(files))
 errChan := make(chan error, len(files))
 
 for _, file := range files {
     go func(f string) {
-        // Process file
         nodes, err := adapter.Ingest(ctx, []string{f})
         if err != nil {
             errChan <- err

@@ -79,10 +79,10 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 		if importedByAnyone[file] {
 			continue
 		}
-		tree := scanner.CollectTree(file, importGraph, make(map[string]bool))
+		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),
-			Files: tree,
+			Root:  root,
 		})
 	}
 	return trees

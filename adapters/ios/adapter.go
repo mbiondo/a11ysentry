@@ -16,23 +16,51 @@ func NewIOSAdapter() ports.Adapter {
 	return &iosAdapter{}
 }
 
-func (a *iosAdapter) Ingest(ctx context.Context, files []string) ([]domain.USN, error) {
+func (a *iosAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
+	files := a.flatten(root)
 	var allNodes []domain.USN
+	nodeChan := make(chan []domain.USN, len(files))
+	errChan := make(chan error, len(files))
 
 	for _, file := range files {
-		content, err := os.ReadFile(file)
-		if err != nil {
-			return nil, err
-		}
+		go func(f string) {
+			content, err := os.ReadFile(f)
+			if err != nil {
+				errChan <- err
+				return
+			}
 
-		src := string(content)
-		// Try SwiftUI first, then UIKit (simple heuristic)
-		nodes := a.parseSwiftUI(src, file)
-		nodes = append(nodes, a.parseUIKit(src, file)...)
-		allNodes = append(allNodes, nodes...)
+			src := string(content)
+			// Try SwiftUI first, then UIKit (simple heuristic)
+			nodes := a.parseSwiftUI(src, f)
+			nodes = append(nodes, a.parseUIKit(src, f)...)
+			nodeChan <- nodes
+		}(file)
+	}
+
+	for i := 0; i < len(files); i++ {
+		select {
+		case nodes := <-nodeChan:
+			allNodes = append(allNodes, nodes...)
+		case err := <-errChan:
+			return nil, err
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
 
 	return allNodes, nil
+}
+
+func (a *iosAdapter) flatten(node *domain.FileNode) []string {
+	if node == nil {
+		return nil
+	}
+	res := []string{node.FilePath}
+	for _, c := range node.Children {
+		res = append(res, a.flatten(c)...)
+	}
+	return res
 }
 
 // parseSwiftUI identifies SwiftUI components and accessibility modifiers.
@@ -42,12 +70,14 @@ func (a *iosAdapter) parseSwiftUI(content string, filename string) []domain.USN 
 
 	imageRegex := regexp.MustCompile(`Image\s*\(\s*\"([^\"]*)\"`)
 	labelRegex := regexp.MustCompile(`\.accessibilityLabel\s*\(\s*\"([^\"]*)\"`)
-	buttonRegex := regexp.MustCompile(`Button\s*\(`)
+	buttonRegex := regexp.MustCompile(`Button\s*\(\s*\"([^\"]*)\"`)
+	buttonGenericRegex := regexp.MustCompile(`Button\s*\(`)
 
 	for i, line := range lines {
 		trimmed := strings.TrimSpace(line)
 
 		if matches := imageRegex.FindStringSubmatch(trimmed); matches != nil {
+// ... (omitted, but I need to provide the context)
 // ... (omitted for brevity in instruction, but keep logic)
 			imageName := matches[1]
 			label := "" 
@@ -73,7 +103,29 @@ func (a *iosAdapter) parseSwiftUI(content string, filename string) []domain.USN 
 			})
 		}
 
-		if buttonRegex.MatchString(trimmed) {
+		if matches := buttonRegex.FindStringSubmatch(trimmed); matches != nil {
+			label := matches[1]
+			// Look ahead for accessibilityLabel override
+			lookAhead := 5
+			for j := i; j < i+lookAhead && j < len(lines); j++ {
+				if m := labelRegex.FindStringSubmatch(lines[j]); m != nil {
+					label = m[1]
+					break
+				}
+			}
+			nodes = append(nodes, domain.USN{
+				UID:   fmt.Sprintf("%s-swiftui-btn-%d", filename, i),
+				Role:  domain.RoleButton,
+				Label: label,
+				Source: domain.Source{
+					Platform: domain.PlatformIOSSwiftUI,
+					FilePath: filename,
+					Line:     i + 1,
+					Column:   strings.Index(line, "Button"),
+					RawHTML:  trimmed,
+				},
+			})
+		} else if buttonGenericRegex.MatchString(trimmed) {
 			label := ""
 			// Look ahead for accessibilityLabel override
 			lookAhead := 5

@@ -129,9 +129,11 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 		},
 	}
 
+	cfg := DefaultConfig()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			violations, err := analyzer.Analyze(ctx, tt.nodes)
+			violations, err := analyzer.Analyze(ctx, tt.nodes, cfg)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}

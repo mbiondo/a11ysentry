@@ -9,11 +9,11 @@
 package nuxt
 
 import (
+	"a11ysentry/engine/core/domain"
+	"a11ysentry/scanner"
 	"io/fs"
 	"path/filepath"
 	"strings"
-
-	"a11ysentry/scanner"
 )
 
 // Framework is the Nuxt 3 project framework.
@@ -71,7 +71,14 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 //	[layouts/default.vue (if exists)] + [page.vue] + [imported components]
 func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]string, projectRoot string) []scanner.PageTree {
 	pagesDir := filepath.Join(projectRoot, "pages")
+	if !scanner.DirExists(pagesDir) {
+		pagesDir = filepath.Join(projectRoot, "src", "pages")
+	}
+	
 	defaultLayout := filepath.Join(projectRoot, "layouts", "default.vue")
+	if !scanner.FileExists(defaultLayout) {
+		defaultLayout = filepath.Join(projectRoot, "src", "layouts", "default.vue")
+	}
 	hasDefaultLayout := scanner.FileExists(defaultLayout)
 
 	var trees []scanner.PageTree
@@ -83,18 +90,29 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 			continue
 		}
 
-		// Build component closure for this page.
-		closure := scanner.CollectTree(file, importGraph, make(map[string]bool))
+		visited := make(map[string]bool)
+		var root *domain.FileNode
 
-		var files []string
 		if hasDefaultLayout {
-			files = append(files, defaultLayout)
+			root = scanner.CollectTree(defaultLayout, importGraph, visited)
+			pageNode := scanner.CollectTree(file, importGraph, visited)
+			if pageNode != nil && root != nil {
+				root.Children = append(root.Children, pageNode)
+			} else if pageNode != nil {
+				root = pageNode
+			}
+		} else {
+			root = scanner.CollectTree(file, importGraph, visited)
 		}
-		files = append(files, closure...)
+
+		label := "pages/" + filepath.ToSlash(rel)
+		if strings.Contains(pagesDir, "src") {
+			label = "src/" + label
+		}
 
 		trees = append(trees, scanner.PageTree{
-			Label: "pages/" + filepath.ToSlash(rel),
-			Files: files,
+			Label: label,
+			Root:  root,
 		})
 	}
 

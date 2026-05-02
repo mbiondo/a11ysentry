@@ -27,12 +27,12 @@
 package nextjs
 
 import (
+	"a11ysentry/engine/core/domain"
+	"a11ysentry/scanner"
 	"io/fs"
 	"path/filepath"
 	"sort"
 	"strings"
-
-	"a11ysentry/scanner"
 )
 
 // Framework implements scanner.ProjectFramework for Next.js App Router.
@@ -96,13 +96,8 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 
 // BuildPageTrees builds one PageTree per page.tsx/page.jsx found under app/.
 //
-// Each tree contains, in order:
-//  1. The layout chain: all layout.tsx files from the project root down to the
-//     page's nearest ancestor directory, outermost first.
-//  2. The page file itself.
-//  3. The transitive closure of all components imported by the above files.
-//
-// This mirrors exactly what Next.js renders for a given route.
+// The resulting tree hierarchy matches exactly what Next.js renders:
+// Root Layout -> Nested Layout(s) -> Page -> Components.
 func (f *Framework) BuildPageTrees(
 	allFiles []string,
 	importGraph map[string][]string,
@@ -129,18 +124,37 @@ func (f *Framework) BuildPageTrees(
 	for _, page := range pages {
 		chain := layoutChain(page, layoutByDir, projectRoot)
 
-		// Collect components: start from layouts and page, deduplicate.
 		visited := make(map[string]bool)
-		var treeFiles []string
+		var root *domain.FileNode
+		var current *domain.FileNode
 
+		// Stitch layout chain: outermost first.
 		for _, layout := range chain {
-			treeFiles = append(treeFiles, scanner.CollectTree(layout, importGraph, visited)...)
+			layoutNode := scanner.CollectTree(layout, importGraph, visited)
+			if layoutNode == nil {
+				continue
+			}
+			if root == nil {
+				root = layoutNode
+			} else {
+				current.Children = append(current.Children, layoutNode)
+			}
+			current = layoutNode
 		}
-		treeFiles = append(treeFiles, scanner.CollectTree(page, importGraph, visited)...)
+
+		// Add page at the end of the layout chain.
+		pageNode := scanner.CollectTree(page, importGraph, visited)
+		if pageNode != nil {
+			if root == nil {
+				root = pageNode
+			} else {
+				current.Children = append(current.Children, pageNode)
+			}
+		}
 
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(page, projectRoot),
-			Files: treeFiles,
+			Root:  root,
 		})
 	}
 	return trees

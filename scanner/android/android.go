@@ -1,17 +1,16 @@
 package android
 
 import (
+	"a11ysentry/engine/core/domain"
+	"a11ysentry/scanner"
 	"io/fs"
 	"path/filepath"
 	"strings"
-
-	"a11ysentry/scanner"
 )
 
 // Framework implements scanner.ProjectFramework for Android projects.
 type Framework struct{}
 
-// New returns a new Android framework scanner.
 func New() *Framework { return &Framework{} }
 
 func (f *Framework) Name() string { return "Android (Kotlin/Java)" }
@@ -56,9 +55,6 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 }
 
 // BuildPageTrees groups all files into a single analysis unit for simplicity.
-// Mobile apps don't have a clear "page" concept like web routes, so we
-// treat the entire module as one big context or we could split by Activity.
-// For the first iteration, we'll just group everything.
 func (f *Framework) BuildPageTrees(
 	allFiles []string,
 	importGraph map[string][]string,
@@ -68,12 +64,15 @@ func (f *Framework) BuildPageTrees(
 		return nil
 	}
 
-	// Heuristic: try to identify "roots" (Activities, Fragments, or Compose entry points).
-	// For now, we'll return one big tree with all UI files.
+	root := &domain.FileNode{FilePath: projectRoot}
+	for _, f := range allFiles {
+		root.Children = append(root.Children, &domain.FileNode{FilePath: f})
+	}
+
 	return []scanner.PageTree{
 		{
 			Label: "Android App",
-			Files: allFiles,
+			Root:  root,
 		},
 	}
 }
