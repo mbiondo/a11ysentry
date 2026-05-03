@@ -582,6 +582,7 @@ func handleMCPSubcommand(args []string) {
 			Title: "Register A11ySentry in AI Agents",
 			Choices: []tui.Choice{
 				{Label: "Claude Desktop"},
+				{Label: "Claude Code (CLI)"},
 				{Label: "Cursor IDE"},
 				{Label: "VSCode (Cline/Roo-Code)"},
 				{Label: "Gemini CLI MCP"},
@@ -614,6 +615,8 @@ func handleMCPSubcommand(args []string) {
 				switch choice.Label {
 				case "Claude Desktop":
 					err = registration.RegisterClaude(*binaryPath)
+				case "Claude Code (CLI)":
+					err = registration.RegisterClaudeCode(*binaryPath)
 				case "Cursor IDE":
 					err = registration.RegisterCursor(*binaryPath)
 				case "VSCode (Cline/Roo-Code)":
