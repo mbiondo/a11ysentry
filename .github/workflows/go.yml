@@ -27,7 +27,7 @@ jobs:
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.4
-          args: --timeout=5m ./...
+          args: --timeout=5m engine/... scanner/... mcp/... cmd/a11ysentry/... adapters/android/... adapters/angular/... adapters/blazor/... adapters/django/... adapters/dotnet/... adapters/electron/... adapters/flask/... adapters/flutter/... adapters/godot/... adapters/ios/... adapters/javadesktop/... adapters/pyqt/... adapters/reactnative/... adapters/unity/... adapters/vue/... adapters/web/...
         env:
           GOWORK: ${{ github.workspace }}/go.work
 
