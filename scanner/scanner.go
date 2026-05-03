@@ -24,6 +24,13 @@ var ProjectMarkers = []string{
 	"a11ysentry.json",   // Tool-specific config
 	"go.mod",            // Go projects
 	"GEMINI.md",         // Agent-driven projects
+	"manage.py",         // Django
+	"app.py",            // Flask
+	"requirements.txt",  // Python generic
+	"angular.json",      // Angular
+	".csproj",           // .NET
+	".sln",              // .NET solution
+	".ui",               // PyQt
 }
 
 // ProjectDirExtensions is the set of directory extensions that identify a project root.
@@ -45,16 +52,28 @@ var SkipDirs = map[string]bool{
 
 // isProjectRoot returns true if dir contains any of the known project markers.
 func isProjectRoot(dir string) bool {
-	for _, marker := range ProjectMarkers {
-		if FileExists(filepath.Join(dir, marker)) {
-			return true
-		}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return false
 	}
-	for _, ext := range ProjectDirExtensions {
-		entries, err := os.ReadDir(dir)
-		if err != nil {
+
+	for _, entry := range entries {
+		if entry.IsDir() {
 			continue
 		}
+		name := entry.Name()
+		for _, marker := range ProjectMarkers {
+			if strings.HasPrefix(marker, ".") {
+				if strings.HasSuffix(name, marker) {
+					return true
+				}
+			} else if name == marker {
+				return true
+			}
+		}
+	}
+
+	for _, ext := range ProjectDirExtensions {
 		for _, entry := range entries {
 			if entry.IsDir() && strings.HasSuffix(entry.Name(), ext) {
 				return true

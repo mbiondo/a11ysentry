@@ -1,6 +1,6 @@
 module a11ysentry/engine
 
-go 1.24
+go 1.25.0
 
 require modernc.org/sqlite v1.50.0
 

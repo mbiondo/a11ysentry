@@ -15,8 +15,9 @@ Most accessibility tools are platform-locked and rely on brittle heuristics or s
 
 ### 🌍 Massive Platform Support
 - **Web**: React, Vue, Svelte, Angular, Astro (with automatic layout-chain resolution).
-- **Mobile**: Android (Compose/XML), iOS (SwiftUI/UIKit), **React Native**, and **Flutter**.
-- **Desktop**: .NET (MAUI/WPF), Java (FX/Swing), Electron, Tauri.
+- **Python**: **Django** and **Flask/Jinja2** (with full template inheritance support).
+- **Mobile**: Android (Compose/XML), iOS (SwiftUI/UIKit), **React Native**, **Flutter**, and **MAUI**.
+- **Desktop**: .NET (MAUI/WPF), **PyQt/PySide** (native .ui parsing), Java (FX/Swing), Electron, Tauri.
 - **Gaming**: Unity, Godot.
 
 ### 🧠 Intelligent Analysis

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="windowTitle">
+   <string>A11ySentry PyQt Example</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="verticalLayout">
+    <item>
+     <widget class="QPushButton" name="submitButton">
+      <property name="text">
+       <string>Submit</string>
+      </property>
+      <!-- Violation: image without accessible name would be caught, but here we test label mapping -->
+      <property name="accessibleName">
+       <string>Submit application</string>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="emptyButton">
+      <property name="text">
+       <string/>
+      </property>
+      <!-- Violation: button without text/accessibleName -->
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+</ui>

@@ -16,6 +16,12 @@ import (
 	"a11ysentry/adapters/reactnative"
 	"a11ysentry/adapters/unity"
 	"a11ysentry/adapters/web"
+	django_adapter "a11ysentry/adapters/django"
+	flask_adapter "a11ysentry/adapters/flask"
+	angular_adapter "a11ysentry/adapters/angular"
+	vue_adapter "a11ysentry/adapters/vue"
+	pyqt_adapter "a11ysentry/adapters/pyqt"
+	electron_adapter "a11ysentry/adapters/electron"
 	"a11ysentry/engine/core/domain"
 	"a11ysentry/engine/core/ports"
 	"a11ysentry/scanner"
@@ -26,6 +32,13 @@ import (
 	"a11ysentry/scanner/nextjs"
 	"a11ysentry/scanner/nuxt"
 	"a11ysentry/scanner/sveltekit"
+	"a11ysentry/scanner/django"
+	"a11ysentry/scanner/flask"
+	"a11ysentry/scanner/angular"
+	"a11ysentry/scanner/vue"
+	dotnetfw "a11ysentry/scanner/dotnet"
+	pyqtfw "a11ysentry/scanner/pyqt"
+	electronfw "a11ysentry/scanner/electron"
 	"os"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -93,6 +106,13 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 			astrofw.New(),
 			nuxt.New(),
 			sveltekit.New(),
+			django.New(),
+			flask.New(),
+			angular.New(),
+			vue.New(),
+			dotnetfw.New(),
+			pyqtfw.New(),
+			electronfw.New(),
 			androidfw.New(),
 			iosfw.New(),
 			generic.New(),
@@ -148,7 +168,6 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 			log.Printf("Could not resolve absolute path for %s: %v", p, err)
 			continue
 		}
-
 		// 1. Detect framework to use its collection/tree building logic
 		dir := filepath.Dir(absPath)
 		fw := scanner.Detect(dir,
@@ -156,6 +175,13 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 			astrofw.New(),
 			nuxt.New(),
 			sveltekit.New(),
+			django.New(),
+			flask.New(),
+			angular.New(),
+			vue.New(),
+			dotnetfw.New(),
+			pyqtfw.New(),
+			electronfw.New(),
 			androidfw.New(),
 			iosfw.New(),
 			generic.New(),
@@ -246,8 +272,27 @@ func getAdapterAndPlatform(filePath, fwName string) (ports.Adapter, domain.Platf
 		return godot.NewGodotAdapter(), domain.PlatformGodot
 	case ".java":
 		return android.NewAndroidAdapter(), domain.PlatformAndroidView
-	default:
-		return nil, ""
 	}
+
+	if fwName == "django" {
+		return django_adapter.NewDjangoAdapter(), domain.Platform("django")
+	}
+	if fwName == "flask" {
+		return flask_adapter.NewFlaskAdapter(), domain.Platform("flask")
+	}
+	if fwName == "angular" {
+		return angular_adapter.NewAngularAdapter(), domain.Platform("angular")
+	}
+	if fwName == "vue" {
+		return vue_adapter.NewVueAdapter(), domain.Platform("vue")
+	}
+	if fwName == "pyqt" {
+		return pyqt_adapter.NewPyQtAdapter(), domain.Platform("pyqt")
+	}
+	if fwName == "electron" {
+		return electron_adapter.NewElectronAdapter(), domain.Platform("electron")
+	}
+
+	return nil, ""
 }
 

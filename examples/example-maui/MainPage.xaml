@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="ExampleMaui.MainPage">
+    <StackLayout>
+        <Label Text="MAUI Example" />
+        
+        <Button SemanticProperties.Description="Submit the form"
+                Text="Submit" />
+                
+        <Button x:Name="EmptyButton" /> <!-- Violation: empty button -->
+        
+        <Image Source="logo.png"
+               SemanticProperties.Description="A11ySentry Logo" />
+    </StackLayout>
+</ContentPage>

@@ -11,6 +11,12 @@ import (
 	"a11ysentry/adapters/reactnative"
 	"a11ysentry/adapters/unity"
 	"a11ysentry/adapters/web"
+	"a11ysentry/adapters/django"
+	"a11ysentry/adapters/flask"
+	"a11ysentry/adapters/angular"
+	"a11ysentry/adapters/vue"
+	"a11ysentry/adapters/pyqt"
+	"a11ysentry/adapters/electron"
 	"a11ysentry/cmd/a11ysentry/internal/sarif"
 	"a11ysentry/cmd/a11ysentry/internal/tui"
 	"a11ysentry/engine/core/domain"
@@ -28,6 +34,13 @@ import (
 	"a11ysentry/scanner/nuxt"
 	rnfw "a11ysentry/scanner/reactnative"
 	sveltekit "a11ysentry/scanner/sveltekit"
+	djangofw "a11ysentry/scanner/django"
+	flaskfw "a11ysentry/scanner/flask"
+	angularfw "a11ysentry/scanner/angular"
+	vuefw "a11ysentry/scanner/vue"
+	dotnetfw "a11ysentry/scanner/dotnet"
+	pyqtfw "a11ysentry/scanner/pyqt"
+	electronfw "a11ysentry/scanner/electron"
 
 	"context"
 	"encoding/json"
@@ -237,6 +250,13 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		astrofw.New(),
 		nuxt.New(),
 		sveltekit.New(),
+		djangofw.New(),
+		flaskfw.New(),
+		angularfw.New(),
+		vuefw.New(),
+		dotnetfw.New(),
+		pyqtfw.New(),
+		electronfw.New(),
 		androidfw.New(),
 		iosfw.New(),
 		flutterfw.New(),
@@ -298,6 +318,27 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			case "React Native (TSX/JSX)":
 				adapter = reactnative.NewReactNativeAdapter()
 				platform = domain.PlatformReactNative
+			case "Django":
+				adapter = django.NewDjangoAdapter()
+				platform = domain.Platform("django")
+			case "Flask":
+				adapter = flask.NewFlaskAdapter()
+				platform = domain.Platform("flask")
+			case "Angular":
+				adapter = angular.NewAngularAdapter()
+				platform = domain.Platform("angular")
+			case "Vue":
+				adapter = vue.NewVueAdapter()
+				platform = domain.Platform("vue")
+			case "DotNet":
+				adapter = dotnet.NewDotNetAdapter()
+				platform = domain.PlatformDotNetXAML
+			case "PyQt":
+				adapter = pyqt.NewPyQtAdapter()
+				platform = domain.Platform("pyqt")
+			case "Electron":
+				adapter = electron.NewElectronAdapter()
+				platform = domain.Platform("electron")
 			default:
 				adapter = web.NewHTMLAdapter()
 			}

@@ -326,14 +326,7 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				}
 			}
 
-			// Map framework-specific labels
-			if attr.Key == "aria-label" || attr.Key == "alt" ||
-				attr.Key == ":alt" || attr.Key == "v-bind:alt" ||
-				attr.Key == "bind:alt" {
-				if strings.TrimSpace(attr.Val) != "" {
-					usn.Label = attr.Val
-				}
-			}
+
 
 			if attr.Key == "style" {
 				parts := strings.Split(attr.Val, ";")
@@ -443,8 +436,11 @@ func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
 func (a *htmlAdapter) getLabel(n *html.Node) string {
 	// 1. Check aria-label or alt (highest priority — explicit accessible name)
 	for _, attr := range n.Attr {
-		if attr.Key == "aria-label" || attr.Key == "alt" || attr.Key == ":alt" || attr.Key == "bind:alt" {
+		if attr.Key == "aria-label" || attr.Key == "alt" || attr.Key == ":alt" || attr.Key == "bind:alt" || attr.Key == "v-bind:alt" || attr.Key == "[alt]" || attr.Key == "[attr.alt]" || attr.Key == "[attr.aria-label]" {
 			if strings.TrimSpace(attr.Val) != "" {
+				if attr.Key == ":alt" || attr.Key == "bind:alt" || attr.Key == "v-bind:alt" || attr.Key == "[alt]" || attr.Key == "[attr.alt]" || attr.Key == "[attr.aria-label]" {
+					return "{{" + attr.Val + "}}"
+				}
 				return attr.Val
 			}
 		}

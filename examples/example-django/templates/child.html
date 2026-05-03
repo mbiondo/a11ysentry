@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1 class="text-2xl font-bold mb-4">Welcome to the Dashboard</h1>
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="card p-4 bg-white shadow rounded">
+            <!-- Violation: low contrast text -->
+            <p class="text-gray-300" style="color: #eee; background-color: #fff">This text is very hard to read.</p>
+        </div>
+        
+        <div class="card p-4 bg-white shadow rounded">
+            <!-- Violation: form input without label -->
+            <input type="text" placeholder="Search..." class="border p-2" />
+        </div>
+    </div>
+{% endblock %}

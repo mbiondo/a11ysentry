@@ -106,7 +106,9 @@ func (a *dotNetAdapter) parseXAML(content string, filename string) []domain.USN 
 			if role != "" {
 				for _, attr := range se.Attr {
 					// AutomationProperties.Name is the key for .NET accessibility
+					// SemanticProperties.Description is the key for MAUI accessibility
 					if strings.Contains(attr.Name.Local, "AutomationProperties.Name") || 
+					   strings.Contains(attr.Name.Local, "SemanticProperties.Description") ||
 					   attr.Name.Local == "Content" || 
 					   attr.Name.Local == "Text" || 
 					   attr.Name.Local == "Placeholder" {
