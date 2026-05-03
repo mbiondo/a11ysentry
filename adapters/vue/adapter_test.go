@@ -39,7 +39,9 @@ const submit = () => {}
 </style>
 	`
 
-	os.WriteFile(filepath.Join(tmpDir, "Card.vue"), []byte(vueContent), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "Card.vue"), []byte(vueContent), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	adapter := vue.NewVueAdapter()
 	rootNode := &domain.FileNode{FilePath: filepath.Join(tmpDir, "Card.vue")}

@@ -38,7 +38,9 @@ func TestPyQtAdapter_XMLParsing(t *testing.T) {
 </ui>
 	`
 
-	os.WriteFile(filepath.Join(tmpDir, "main.ui"), []byte(uiContent), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "main.ui"), []byte(uiContent), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	adapter := pyqt.NewPyQtAdapter()
 	rootNode := &domain.FileNode{FilePath: filepath.Join(tmpDir, "main.ui")}

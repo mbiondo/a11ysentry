@@ -33,9 +33,15 @@ func TestDjangoAdapter_InheritanceAndInclude(t *testing.T) {
 	{% endblock %}
 	`
 
-	os.WriteFile(filepath.Join(tmpDir, "base.html"), []byte(baseHTML), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "nav.html"), []byte(navHTML), 0644)
-	os.WriteFile(filepath.Join(tmpDir, "child.html"), []byte(childHTML), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "base.html"), []byte(baseHTML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "nav.html"), []byte(navHTML), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(tmpDir, "child.html"), []byte(childHTML), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	adapter := django.NewDjangoAdapter()
 	rootNode := &domain.FileNode{FilePath: filepath.Join(tmpDir, "child.html")}

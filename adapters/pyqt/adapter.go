@@ -64,12 +64,14 @@ func (a *pyqtAdapter) parseUI(content string, filename string) []domain.USN {
 
 		switch se := token.(type) {
 		case xml.StartElement:
-			if se.Name.Local == "widget" {
+			switch se.Name.Local {
+			case "widget":
 				var class, name string
 				for _, attr := range se.Attr {
-					if attr.Name.Local == "class" {
+					switch attr.Name.Local {
+					case "class":
 						class = attr.Value
-					} else if attr.Name.Local == "name" {
+					case "name":
 						name = attr.Value
 					}
 				}
@@ -98,14 +100,12 @@ func (a *pyqtAdapter) parseUI(content string, filename string) []domain.USN {
 					},
 				})
 				currentWidgetIdx = len(nodes) - 1
-			} else if se.Name.Local == "property" {
+			case "property":
 				for _, attr := range se.Attr {
 					if attr.Name.Local == "name" {
 						currentPropName = attr.Value
 					}
 				}
-			} else if se.Name.Local == "string" {
-				// String tag starts, we will catch data in CharData
 			}
 
 		case xml.CharData:
@@ -121,9 +121,10 @@ func (a *pyqtAdapter) parseUI(content string, filename string) []domain.USN {
 			}
 
 		case xml.EndElement:
-			if se.Name.Local == "property" {
+			switch se.Name.Local {
+			case "property":
 				currentPropName = ""
-			} else if se.Name.Local == "widget" {
+			case "widget":
 				currentWidgetIdx = -1
 			}
 		}
