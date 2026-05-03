@@ -61,7 +61,7 @@ import (
 )
 
 var (
-	Version    = "0.0.5"
+	Version    = "0.0.6"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 
@@ -844,7 +844,7 @@ func createPreCommitHook(root string, force bool) error {
 	content := `#!/bin/sh
 # A11ySentry pre-commit hook
 echo "A11ySentry: checking staged files..."
-files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(html|htm|astro|vue|svelte|tsx|jsx|ts|js|razor|kt|xml|dart|swift|xaml|cs|fxml|java)$' || true)
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(html|htm|astro|vue|svelte|tsx|jsx|ts|js|razor|kt|xml|dart|swift|xaml|cs|fxml|java|tscn|prefab|unity)$' || true)
 if [ -z "$files" ]; then
   echo "  No relevant files staged. Skipping."
   exit 0

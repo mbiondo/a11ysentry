@@ -20,10 +20,12 @@ Most accessibility tools are platform-locked and rely on brittle heuristics or s
 - **Desktop**: .NET (MAUI/WPF), **PyQt/PySide** (native .ui parsing), Java (FX/Swing), Electron, Tauri.
 - **Gaming**: Unity, Godot.
 
-### 🧠 Intelligent Analysis
-- **Recursive Context**: Analyzes entire component trees. Accessibility states like `aria-hidden` (Web), `importantForAccessibility` (Android), or `excludeSemantics` (Flutter) are propagated down the tree to detect keyboard focus traps.
-- **Structural Link Purpose (WCAG 2.4.4)**: A language-agnostic rule that detects ambiguous links (same label, different destination) without needing hardcoded dictionaries or LLMs.
-- **Advanced Semantic Rules**: Specialized validation for landmarks, modals (focus traps), fieldsets, and redundant titles.
+### 🧠 The Deterministic Edge
+Unlike LLM-based tools that guess, A11ySentry uses a **pure engineering approach**. It transforms every UI into a **Universal Semantic Node (USN)** tree, allowing for 100% deterministic validation with zero hallucinations.
+
+### 🔍 Intelligent Analysis
+- **Recursive Context Rule (CRITICAL)**: Accessibility states like `aria-hidden`, `disabled`, or platform-specific "exclude from semantics" traits are automatically propagated down the tree. This allows us to catch focus traps and "ghost" interactive elements that other scanners miss.
+- **Structural Link Purpose (WCAG 2.4.4)**: A language-agnostic rule that detects ambiguous links (same label, different destination) by analyzing the entire USN tree for naming collisions.
 - **Tailwind 4 & CSS Support**: Built-in resolution for Tailwind CSS 4 utility classes and external CSS variables. Resolves color contrast statically without a browser.
 
 ### ⚡ Developer Experience
