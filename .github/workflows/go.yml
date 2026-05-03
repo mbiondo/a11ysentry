@@ -21,12 +21,14 @@ jobs:
           go-version: '1.25'
           cache: true
       - name: Create Go Workspace
-        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
+        run: |
+          go work init
+          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
           version: v2.11.4
-          args: --timeout=5m engine/... scanner/... mcp/... cmd/a11ysentry/... adapters/android/... adapters/angular/... adapters/blazor/... adapters/django/... adapters/dotnet/... adapters/electron/... adapters/flask/... adapters/flutter/... adapters/godot/... adapters/ios/... adapters/javadesktop/... adapters/pyqt/... adapters/reactnative/... adapters/unity/... adapters/vue/... adapters/web/...
+          args: --timeout=5m ./...
         env:
           GOWORK: ${{ github.workspace }}/go.work
 
@@ -40,16 +42,24 @@ jobs:
           go-version: '1.25'
           cache: true
       - name: Create Go Workspace
-        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
+        run: |
+          go work init
+          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
 
       - name: Run Engine Tests
         run: go test -v ./engine/...
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
 
       - name: Run Scanner Tests
         run: go test -v ./scanner/...
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
 
       - name: Verify CLI Build
         run: go build -v -o /tmp/a11ysentry ./cmd/a11ysentry
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
 
   release:
     name: Release
@@ -65,7 +75,9 @@ jobs:
           go-version: '1.25'
           cache: true
       - name: Create Go Workspace
-        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
+        run: |
+          go work init
+          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -75,3 +87,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          GOWORK: ${{ github.workspace }}/go.work
