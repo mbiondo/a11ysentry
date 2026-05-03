@@ -18,9 +18,11 @@ jobs:
           go-version: '1.25'
           cache: true
       - name: Create Go Workspace
-        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/blazor ./adapters/dotnet ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/reactnative ./adapters/unity ./adapters/web
+        run: go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
       - name: Build A11ySentry
         run: go build -o a11ysentry ./cmd/a11ysentry
+        env:
+          GOWORK: ${{ github.workspace }}/go.work
       - name: Add to PATH
         run: echo "$(pwd)" >> $GITHUB_PATH
       - name: Run Accessibility Audit (SARIF)

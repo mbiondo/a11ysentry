@@ -22,8 +22,7 @@ jobs:
           cache: true
       - name: Create Go Workspace
         run: |
-          go work init
-          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
+          go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
@@ -43,8 +42,7 @@ jobs:
           cache: true
       - name: Create Go Workspace
         run: |
-          go work init
-          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
+          go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
 
       - name: Run Engine Tests
         run: go test -v ./engine/...
@@ -76,8 +74,7 @@ jobs:
           cache: true
       - name: Create Go Workspace
         run: |
-          go work init
-          go work use ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/*
+          go work init ./engine ./scanner ./mcp ./cmd/a11ysentry ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
         with:
