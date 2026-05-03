@@ -23,7 +23,9 @@ func TestAngularAdapter_Bindings(t *testing.T) {
 	</div>
 	`
 
-	os.WriteFile(filepath.Join(tmpDir, "app.component.html"), []byte(htmlContent), 0644)
+	if err := os.WriteFile(filepath.Join(tmpDir, "app.component.html"), []byte(htmlContent), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	adapter := angular.NewAngularAdapter()
 	rootNode := &domain.FileNode{FilePath: filepath.Join(tmpDir, "app.component.html")}
