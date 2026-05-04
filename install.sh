@@ -64,9 +64,9 @@ else
     EXTRACTED=$(find "$TEMP_DIR" -name "$BINARY_NAME" -type f | head -n 1)
     
     if [ -n "$EXTRACTED" ]; then
-        mv "$EXTRACTED" "$BINARY_FULL"
+        mv -f "$EXTRACTED" "$BINARY_FULL"
         chmod +x "$BINARY_FULL"
-        echo -e "\033[0;32m✅ Successfully installed A11ySentry $TAG.\033[0m"
+        echo -e "\033[0;32m✅ Successfully installed A11ySentry $TAG to $BINARY_FULL\033[0m"
     else
         echo -e "\033[0;31m❌ Binary not found in downloaded archive.\033[0m"
         exit 1
@@ -86,8 +86,10 @@ fi
 
 if [ -n "$SHELL_CONFIG" ]; then
     if ! grep -q "$INSTALL_DIR" "$SHELL_CONFIG"; then
-        echo "export PATH=\"\$PATH:$INSTALL_DIR\"" >> "$SHELL_CONFIG"
-        echo -e "\033[0;32m✅ Added to PATH in $SHELL_CONFIG\033[0m"
+        # Add to the BEGINNING of PATH to override other installations (like brew)
+        echo "export PATH=\"$INSTALL_DIR:\$PATH\"" >> "$SHELL_CONFIG"
+        echo -e "\033[0;32m✅ Added $INSTALL_DIR to the beginning of PATH in $SHELL_CONFIG\033[0m"
+        echo -e "\033[0;33m👉 Please run 'source $SHELL_CONFIG' or restart your terminal.\033[0m"
     fi
 fi
 

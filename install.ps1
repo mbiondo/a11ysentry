@@ -18,7 +18,27 @@ if (!(Test-Path $InstallDir)) {
     New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 }
 
-# 3. Download from GitHub or use local if in DEV MODE
+# 3. Robust Replacement Strategy
+$MoveBinary = {
+    param($src, $dest)
+    if (Test-Path $dest) {
+        Stop-Process -Name "a11ysentry" -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Milliseconds 300
+        try {
+            Move-Item $src -Destination $dest -Force -ErrorAction Stop
+        } catch {
+            # If locked, rename it (Windows allows renaming running binaries)
+            $OldFile = "$dest.old"
+            if (Test-Path $OldFile) { Remove-Item $OldFile -Force -ErrorAction SilentlyContinue }
+            Rename-Item $dest -NewName "$BinaryName.old" -Force -ErrorAction SilentlyContinue
+            Move-Item $src -Destination $dest -Force
+        }
+    } else {
+        Move-Item $src -Destination $dest -Force
+    }
+}
+
+# 4. Download from GitHub or use local if in DEV MODE
 $BinaryFull = Join-Path $InstallDir $BinaryName
 
 # Handle $PSScriptRoot being empty when running via IEX
@@ -28,8 +48,8 @@ if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
 }
 
 if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
-    Copy-Item $LocalBinary -Destination $BinaryFull -Force
-    Write-Host "DEV MODE: Copied binary from local workspace." -ForegroundColor Yellow
+    & $MoveBinary $LocalBinary $BinaryFull
+    Write-Host "DEV MODE: Updated binary from local workspace." -ForegroundColor Yellow
 } else {
     Write-Host "Downloading latest release from GitHub..." -ForegroundColor Cyan
     $LatestReleaseUrl = "https://api.github.com/repos/$Owner/$Repo/releases/latest"
@@ -50,12 +70,13 @@ if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
         # Extract
         Expand-Archive -Path $TempZip -DestinationPath $env:TEMP -Force
         $ExtractedBinary = Join-Path $env:TEMP $BinaryName
+        
         if (Test-Path $ExtractedBinary) {
-            Move-Item $ExtractedBinary -Destination $BinaryFull -Force
+            & $MoveBinary $ExtractedBinary $BinaryFull
         } else {
             $Files = Get-ChildItem -Path $env:TEMP -Filter $BinaryName -Recurse
             if ($Files.Count -gt 0) {
-                Move-Item $Files[0].FullName -Destination $BinaryFull -Force
+                & $MoveBinary $Files[0].FullName $BinaryFull
             } else {
                 throw "Binary not found inside the downloaded archive."
             }
@@ -69,7 +90,7 @@ if ($null -ne $LocalBinary -and (Test-Path $LocalBinary)) {
     }
 }
 
-# 4. Add to PATH
+# 5. Add to PATH
 $UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($UserPath -notlike "*$InstallDir*") {
     $NewPath = "$UserPath;$InstallDir"
@@ -78,14 +99,14 @@ if ($UserPath -notlike "*$InstallDir*") {
     Write-Host "Added to User PATH." -ForegroundColor Green
 }
 
-# 5. MCP Registration & Skill Setup
+# 6. MCP Registration & Skill Setup
 Write-Host "Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
 $BinaryFull = Join-Path $InstallDir $BinaryName
 if (Test-Path $BinaryFull) {
     # Call the binary with the mcp subcommand
     & $BinaryFull mcp --register
     
-    # 6. Skill Registration
+    # 7. Skill Registration
     $SkillSource = $null
     if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
         $SkillSource = Join-Path $PSScriptRoot "skills\a11ysentry-mcp"
