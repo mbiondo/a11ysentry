@@ -63,7 +63,7 @@ import (
 )
 
 var (
-	Version    = "0.0.9"
+	Version    = "0.0.10"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 
@@ -1052,18 +1052,9 @@ func dirExists(path string) bool {
 }
 
 func handleClearSubcommand() {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		log.Fatalf("Error: could not find home directory: %v", err)
-	}
-	dbPath := filepath.Join(homeDir, ".a11ysentry", "history.db")
-
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		fmt.Println("No history database found. Nothing to clear.")
-		return
-	}
-
-	err = os.Remove(dbPath)
+	repo := setupRepository()
+	ctx := context.Background()
+	err := repo.ClearHistory(ctx)
 	if err != nil {
 		log.Fatalf("Error: could not clear history: %v", err)
 	}

@@ -11,4 +11,6 @@ type Repository interface {
 	SaveReport(ctx context.Context, report domain.ViolationReport) error
 	// GetHistory retrieves the last N violation reports.
 	GetHistory(ctx context.Context, limit int) ([]domain.ViolationReport, error)
+	// ClearHistory removes all records from the database.
+	ClearHistory(ctx context.Context) error
 }

@@ -64,6 +64,11 @@ func (r *sqliteRepository) migrate() error {
 	return nil
 }
 
+func (r *sqliteRepository) ClearHistory(ctx context.Context) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM analysis_reports")
+	return err
+}
+
 func (r *sqliteRepository) SaveReport(ctx context.Context, report domain.ViolationReport) error {
 	violationsJSON, err := json.Marshal(report.Violations)
 	if err != nil {

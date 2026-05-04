@@ -203,21 +203,35 @@ func RegisterOpenCode(binaryPath string) error {
 
 	_ = os.MkdirAll(filepath.Dir(path), 0755)
 
-	var config MCPConfig
+	var config map[string]interface{}
 	data, err := os.ReadFile(path)
 	if err == nil {
-		_ = json.Unmarshal(data, &config)
+		if err := json.Unmarshal(data, &config); err != nil {
+			config = make(map[string]interface{})
+		}
+	} else {
+		config = make(map[string]interface{})
 	}
 
-	if config.MCP == nil {
-		config.MCP = make(map[string]OpenCodeServerConfig)
+	mcpRaw, ok := config["mcp"]
+	var mcp map[string]interface{}
+	if ok {
+		if m, ok := mcpRaw.(map[string]interface{}); ok {
+			mcp = m
+		} else {
+			mcp = make(map[string]interface{})
+		}
+	} else {
+		mcp = make(map[string]interface{})
 	}
 
-	config.MCP["a11ysentry"] = OpenCodeServerConfig{
-		Type:    "local",
-		Command: []string{binaryPath, "mcp"},
-		Enabled: true,
+	mcp["a11ysentry"] = map[string]interface{}{
+		"type":    "local",
+		"command": []string{binaryPath, "mcp"},
+		"enabled": true,
 	}
+
+	config["mcp"] = mcp
 
 	newData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
@@ -278,20 +292,34 @@ func RegisterSkill(repoRoot string) error {
 func patchConfig(configPath, binaryPath string) error {
 	_ = os.MkdirAll(filepath.Dir(configPath), 0755)
 
-	var config MCPConfig
+	var config map[string]interface{}
 	data, err := os.ReadFile(configPath)
 	if err == nil {
-		_ = json.Unmarshal(data, &config)
+		if err := json.Unmarshal(data, &config); err != nil {
+			config = make(map[string]interface{})
+		}
+	} else {
+		config = make(map[string]interface{})
 	}
 
-	if config.MCPServers == nil {
-		config.MCPServers = make(map[string]MCPServerConfig)
+	mcpServersRaw, ok := config["mcpServers"]
+	var mcpServers map[string]interface{}
+	if ok {
+		if m, ok := mcpServersRaw.(map[string]interface{}); ok {
+			mcpServers = m
+		} else {
+			mcpServers = make(map[string]interface{})
+		}
+	} else {
+		mcpServers = make(map[string]interface{})
 	}
 
-	config.MCPServers["a11ysentry"] = MCPServerConfig{
-		Command: binaryPath,
-		Args:    []string{"mcp"},
+	mcpServers["a11ysentry"] = map[string]interface{}{
+		"command": binaryPath,
+		"args":    []string{"mcp"},
 	}
+
+	config["mcpServers"] = mcpServers
 
 	newData, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
