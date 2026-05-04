@@ -1,11 +1,15 @@
 # 🛡️ A11ySentry
 
-[![Release](https://img.shields.io/github/v/release/mbiondo/a11ysentry?color=00ADD8&label=version)](https://github.com/mbiondo/a11ysentry/releases)
-[![Build Status](https://github.com/mbiondo/a11ysentry/actions/workflows/release.yml/badge.svg)](https://github.com/mbiondo/a11ysentry/actions/workflows/release.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/mbiondo/a11ysentry)](https://goreportcard.com/report/github.com/mbiondo/a11ysentry)
-[![Go Version](https://img.shields.io/github/go-mod/go-version/mbiondo/a11ysentry)](https://golang.org/doc/devel/release.html)
-[![Code Size](https://img.shields.io/github/languages/code-size/mbiondo/a11ysentry)](https://github.com/mbiondo/a11ysentry)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<div align="left">
+
+[![Release](https://img.shields.io/github/v/release/mbiondo/a11ysentry?style=flat-square&color=00ADD8&label=version)](https://github.com/mbiondo/a11ysentry/releases)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/mbiondo/a11ysentry/go.yml?style=flat-square&label=Build%20Status)](https://github.com/mbiondo/a11ysentry/actions/workflows/go.yml)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat-square&logo=go)](https://golang.org/doc/devel/release.html)
+[![W3C ACT](https://img.shields.io/badge/W3C-ACT_Rules-blue?style=flat-square&logo=w3c)](https://act-rules.github.io/)
+[![Code Size](https://img.shields.io/github/languages/code-size/mbiondo/a11ysentry?style=flat-square)](https://github.com/mbiondo/a11ysentry)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
+
+</div>
 
 **A11ySentry** is a professional-grade, multi-platform accessibility auditing engine. It doesn't just look at files; it understands **Component Architectures**.
 
