@@ -1,5 +1,12 @@
 # 🛡️ A11ySentry
 
+[![Release](https://img.shields.io/github/v/release/mbiondo/a11ysentry?color=00ADD8&label=version)](https://github.com/mbiondo/a11ysentry/releases)
+[![Build Status](https://github.com/mbiondo/a11ysentry/actions/workflows/release.yml/badge.svg)](https://github.com/mbiondo/a11ysentry/actions/workflows/release.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mbiondo/a11ysentry)](https://goreportcard.com/report/github.com/mbiondo/a11ysentry)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/mbiondo/a11ysentry)](https://golang.org/doc/devel/release.html)
+[![Code Size](https://img.shields.io/github/languages/code-size/mbiondo/a11ysentry)](https://github.com/mbiondo/a11ysentry)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 **A11ySentry** is a professional-grade, multi-platform accessibility auditing engine. It doesn't just look at files; it understands **Component Architectures**.
 
 Built for modern frontend engineering, it reconstructs the rendering hierarchy (PageTrees) of your application to provide precise, context-aware accessibility analysis with zero false positives.
