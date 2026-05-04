@@ -37,21 +37,24 @@ func (r *sqliteRepository) migrate() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS analysis_reports (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		run_id TEXT,
 		project_name TEXT,
 		project_root TEXT,
 		file_path TEXT NOT NULL,
 		platform TEXT NOT NULL,
 		timestamp INTEGER NOT NULL,
-		violations_json TEXT NOT NULL
+		violations_json TEXT NOT NULL,
+		hierarchy_json TEXT
 	);
 	CREATE INDEX IF NOT EXISTS idx_reports_timestamp ON analysis_reports(timestamp);
+	CREATE INDEX IF NOT EXISTS idx_reports_run_id ON analysis_reports(run_id);
 	`
 	if _, err := r.db.Exec(query); err != nil {
 		return err
 	}
 
 	// Simple check-and-add for migration (SQLite doesn't support IF NOT EXISTS for columns)
-	columns := []string{"project_name", "project_root"}
+	columns := []string{"run_id", "project_name", "project_root", "hierarchy_json"}
 	for _, col := range columns {
 		_, err := r.db.Exec(fmt.Sprintf("ALTER TABLE analysis_reports ADD COLUMN %s TEXT", col))
 		// Ignore error if column already exists
@@ -67,20 +70,26 @@ func (r *sqliteRepository) SaveReport(ctx context.Context, report domain.Violati
 		return fmt.Errorf("failed to marshal violations: %w", err)
 	}
 
+	hierarchyJSON := ""
+	if report.Hierarchy != nil {
+		hData, _ := json.Marshal(report.Hierarchy)
+		hierarchyJSON = string(hData)
+	}
+
 	if report.Timestamp == 0 {
 		report.Timestamp = time.Now().Unix()
 	}
 
 	_, err = r.db.ExecContext(ctx,
-		"INSERT INTO analysis_reports (project_name, project_root, file_path, platform, timestamp, violations_json) VALUES (?, ?, ?, ?, ?, ?)",
-		report.ProjectName, report.ProjectRoot, report.FilePath, report.Platform, report.Timestamp, string(violationsJSON),
+		"INSERT INTO analysis_reports (run_id, project_name, project_root, file_path, platform, timestamp, violations_json, hierarchy_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		report.RunID, report.ProjectName, report.ProjectRoot, report.FilePath, report.Platform, report.Timestamp, string(violationsJSON), hierarchyJSON,
 	)
 	return err
 }
 
 func (r *sqliteRepository) GetHistory(ctx context.Context, limit int) ([]domain.ViolationReport, error) {
 	rows, err := r.db.QueryContext(ctx,
-		"SELECT id, project_name, project_root, file_path, platform, timestamp, violations_json FROM analysis_reports ORDER BY timestamp DESC LIMIT ?",
+		"SELECT id, run_id, project_name, project_root, file_path, platform, timestamp, violations_json, hierarchy_json FROM analysis_reports ORDER BY timestamp DESC LIMIT ?",
 		limit,
 	)
 	if err != nil {
@@ -92,17 +101,27 @@ func (r *sqliteRepository) GetHistory(ctx context.Context, limit int) ([]domain.
 	for rows.Next() {
 		var rep domain.ViolationReport
 		var violationsJSON string
+		var runID, hierarchyJSON sql.NullString
 		var projectName, projectRoot sql.NullString
-		if err := rows.Scan(&rep.ID, &projectName, &projectRoot, &rep.FilePath, &rep.Platform, &rep.Timestamp, &violationsJSON); err != nil {
+		if err := rows.Scan(&rep.ID, &runID, &projectName, &projectRoot, &rep.FilePath, &rep.Platform, &rep.Timestamp, &violationsJSON, &hierarchyJSON); err != nil {
 			return nil, err
 		}
 
+		rep.RunID = runID.String
 		rep.ProjectName = projectName.String
 		rep.ProjectRoot = projectRoot.String
 
 		if err := json.Unmarshal([]byte(violationsJSON), &rep.Violations); err != nil {
 			return nil, err
 		}
+
+		if hierarchyJSON.Valid && hierarchyJSON.String != "" {
+			var h domain.FileNode
+			if err := json.Unmarshal([]byte(hierarchyJSON.String), &h); err == nil {
+				rep.Hierarchy = &h
+			}
+		}
+
 		reports = append(reports, rep)
 	}
 

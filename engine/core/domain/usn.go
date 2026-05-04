@@ -87,10 +87,11 @@ type Hierarchy struct {
 
 // Source represents the origin information of a USN node.
 type Source struct {
-	Platform    Platform
-	FilePath    string
-	Line        int
-	Column      int
-	RawHTML     string
-	IsComponent bool // true when the file is a partial component, not a full HTML document
+	Platform     Platform
+	FilePath     string
+	Line         int
+	Column       int
+	RawHTML      string
+	IsComponent  bool     // true when the file is a partial component, not a full HTML document
+	IgnoredRules []string // list of error codes to ignore for this specific element
 }

@@ -2,7 +2,9 @@ package angular
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"a11ysentry/scanner"
@@ -49,8 +51,42 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
+var (
+	angularTemplateRe = regexp.MustCompile(`templateUrl\s*:\s*['"]([^'"]+)['"]`)
+	angularStyleRe    = regexp.MustCompile(`styleUrls\s*:\s*\[\s*['"]([^'"]+)['"]`)
+)
+
 func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+	src := string(content)
+
+	// 1. Standard TS imports
+	resolved := scanner.ResolveImports(filePath, projectRoot, fileSet)
+	
+	base := filepath.Dir(filePath)
+
+	// 2. Angular template resolution
+	if m := angularTemplateRe.FindStringSubmatch(src); len(m) > 1 {
+		abs := filepath.Clean(filepath.Join(base, m[1]))
+		if fileSet[abs] {
+			resolved = append(resolved, abs)
+		}
+	}
+
+	// 3. Angular styles resolution (simplified: first style only for now)
+	if m := angularStyleRe.FindAllStringSubmatch(src, -1); len(m) > 0 {
+		for _, match := range m {
+			abs := filepath.Clean(filepath.Join(base, match[1]))
+			if fileSet[abs] {
+				resolved = append(resolved, abs)
+			}
+		}
+	}
+
+	return resolved
 }
 
 func (f *Framework) BuildPageTrees(

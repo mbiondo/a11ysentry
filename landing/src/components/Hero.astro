@@ -14,16 +14,16 @@
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-neon-cyan opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-neon-cyan"></span>
                 </span>
-                Version 0.0.2 is live
+                Version 0.0.7 is live
             </div>
             
             <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight leading-[1.1]">
-                Accessible UI <br/>
-                <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-emerald">by Engineering.</span>
+                Context-Aware <br/>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-emerald">A11y Engineering.</span>
             </h1>
             
             <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto lg:mx-0 leading-relaxed">
-                Stop guessing with probabilistic LLMs. A11ySentry provides 100% deterministic, local accessibility validation for <span class="text-white font-semibold underline decoration-neon-cyan/30">15+ platforms</span>.
+                A11ySentry understands <span class="text-white font-semibold">Component Hierarchies</span>. Built for the AI age, it provides deterministic audits for <span class="text-neon-emerald font-bold">Claude Code, Gemini CLI, and OpenCode</span> via MCP.
             </p>
 
             <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
@@ -36,82 +36,99 @@
             </div>
         </div>
 
-        <!-- Terminal & Visualizer Mockup -->
+        <!-- Animated TUI Visualizer -->
         <div class="relative group">
-            <div class="absolute -inset-1 bg-gradient-to-r from-neon-cyan to-neon-emerald rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
-            <div class="relative glass rounded-2xl overflow-hidden shadow-2xl">
+            <div class="absolute -inset-1 bg-gradient-to-r from-neon-cyan to-neon-emerald rounded-2xl blur opacity-5 group-hover:opacity-20 transition duration-1000 group-hover:duration-200"></div>
+            <div class="relative bg-[#1a1b26] rounded-2xl overflow-hidden shadow-2xl border border-white/5 flex flex-col font-mono">
                 <!-- Terminal Header -->
-                <div class="bg-slate-900/80 px-4 py-3 border-b border-slate-800 flex items-center gap-2">
-                    <div class="flex gap-1.5">
-                        <div class="w-3 h-3 rounded-full bg-red-500/20"></div>
-                        <div class="w-3 h-3 rounded-full bg-amber-500/20"></div>
-                        <div class="w-3 h-3 rounded-full bg-emerald-500/20"></div>
+                <div class="bg-[#16161e] px-4 py-2.5 border-b border-white/5 flex items-center justify-between">
+                    <div class="flex gap-2">
+                        <div class="w-2.5 h-2.5 rounded-full bg-[#f7768e]/40"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-[#e0af68]/40"></div>
+                        <div class="w-2.5 h-2.5 rounded-full bg-[#9ece6a]/40"></div>
                     </div>
-                    <div class="text-[10px] text-slate-500 font-mono uppercase tracking-widest ml-2">a11ysentry --analyze</div>
+                    <div class="text-[9px] text-[#565f89] uppercase tracking-[0.2em] font-bold">a11ysentry-tui</div>
+                    <div class="w-10"></div>
                 </div>
                 
-                <!-- Terminal Content -->
-                <div class="p-6 font-mono text-sm sm:text-base space-y-4">
-                    <div class="flex gap-3">
-                        <span class="text-neon-cyan">$</span>
-                        <span class="text-slate-300">a11ysentry .</span>
+                <!-- Animated TUI Content -->
+                <div class="p-0 text-sm h-[400px] flex flex-col relative overflow-hidden bg-[#1a1b26]">
+                    <!-- Top Bar -->
+                    <div class="bg-neon-cyan text-[#1a1b26] px-4 py-1 text-[10px] font-black flex justify-between uppercase">
+                        <span>Component Explorer: frontend-web</span>
+                        <span class="opacity-60">Press 't' for list</span>
                     </div>
-                    <div class="space-y-2">
-                        <div class="text-slate-500 italic text-xs"># Resolving component trees & USN mappings...</div>
-                        <div class="flex items-center gap-2 text-neon-emerald text-xs">
-                            <span>✓</span>
-                            <span>Astro, React, and Tailwind adapters loaded</span>
-                        </div>
-                    </div>
-                    
-                    <div class="pt-4 border-t border-slate-800/50 space-y-4">
-                        <div class="flex items-center gap-2 text-[10px]">
-                            <span class="text-neon-cyan">🛡️</span>
-                            <span class="text-slate-400 uppercase tracking-widest">Analysis Results:</span>
-                            <span class="text-white">analytics-dashboard/app/page.tsx</span>
-                        </div>
-                        
-                        <div class="text-xs font-bold text-slate-300">Found 10 issues (8 errors, 2 warnings)</div>
-                        
-                        <div class="p-4 bg-red-500/5 border border-red-500/20 rounded-xl space-y-3">
-                            <div class="flex items-center gap-3">
-                                <span class="px-1.5 py-0.5 bg-red-500 text-slate-950 text-[9px] font-black rounded-sm">ERROR</span>
-                                <span class="text-red-400 font-bold text-[10px]">WCAG_3_3_2</span>
+
+                    <div class="flex-1 p-4 overflow-hidden">
+                        <div id="tree-animation" class="space-y-0 text-[12px] leading-6">
+                            <!-- Tree Rows with Grid for perfect alignment -->
+                            <div class="tree-row grid grid-cols-[20px_1fr_auto] items-center gap-1 opacity-0">
+                                <span class="text-neon-cyan text-center">🌳</span>
+                                <span class="text-white font-bold truncate">app/layout.tsx</span>
+                                <div class="flex gap-2 text-[10px]">
+                                    <span class="text-[#f7768e]">2 🔴</span>
+                                    <span class="text-[#e0af68]">1 🟠</span>
+                                </div>
                             </div>
-                            <p class="text-white text-[11px] leading-relaxed">input missing accessible name or label.</p>
-                            <div class="space-y-1.5">
-                                <div class="text-[9px] text-neon-cyan font-bold uppercase tracking-tighter">SOURCE CODE:</div>
-                                <code class="block bg-black/40 p-2 rounded text-[10px] text-slate-300 border border-slate-800/50 overflow-hidden">
-                                    &lt;select value="&#123;customerId&#125;" onValueChange="&#123;setCustomerId&#125;"&gt;
-                                </code>
+                            <div class="tree-row grid grid-cols-[20px_20px_1fr_auto] items-center gap-1 opacity-0">
+                                <span class="text-[#565f89] text-right pr-1">└</span>
+                                <span class="text-neon-emerald text-center">🌳</span>
+                                <span class="text-[#9ece6a] truncate">components/Navbar.tsx</span>
+                                <span class="text-[10px] text-[#9ece6a]">✅ clean</span>
                             </div>
-                            <div class="space-y-1">
-                                <div class="text-[9px] text-neon-emerald font-bold uppercase tracking-tighter">SUGGESTED FIX:</div>
-                                <p class="text-[10px] text-slate-300">Ensure the control has a visible label or an internal accessibility name.</p>
+                            <div class="tree-row grid grid-cols-[20px_20px_1fr_auto] items-center gap-1 opacity-0">
+                                <span class="text-[#565f89] text-right pr-1">└</span>
+                                <span class="text-neon-cyan text-center">🌳</span>
+                                <span class="text-white truncate">app/page.tsx</span>
+                                <span class="text-[10px] text-[#f7768e]">1 🔴</span>
                             </div>
-                            <div class="text-[9px] text-slate-500">
-                                Learn more: <span class="underline">https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA14</span>
+                            <!-- Selection Simulation -->
+                            <div class="tree-row grid grid-cols-[20px_20px_20px_1fr_auto] items-center gap-1 opacity-0 relative bg-white/5 py-0 -mx-4 px-4">
+                                <span class="col-start-2 text-[#565f89] text-right pr-1">└</span>
+                                <span class="text-[#f7768e] text-center">🌳</span>
+                                <span class="text-[#f7768e] font-bold truncate">components/Card.tsx</span>
+                                <span class="text-[9px] bg-[#f7768e] text-[#1a1b26] px-1 rounded font-black">FAIL</span>
+                                <div class="absolute left-0 top-0 w-1 h-full bg-neon-cyan select-cursor opacity-0"></div>
+                            </div>
+                            <div class="tree-row grid grid-cols-[20px_20px_20px_1fr_auto] items-center gap-1 opacity-0">
+                                <span class="col-start-2 text-[#565f89] text-right pr-1">└</span>
+                                <span class="text-[#7aa2f7] text-center">↺</span>
+                                <span class="text-[#565f89] italic truncate">SharedIcon.kt (circular)</span>
+                            </div>
+
+                            <div class="h-4"></div>
+                            <div class="tree-row opacity-0 border-t border-white/5 pt-2">
+                                <span class="text-[#565f89]">────────────────────────────────────────────</span>
+                            </div>
+
+                            <!-- Detail Panel -->
+                            <div class="detail-panel mt-2 p-4 bg-[#16161e] border border-white/5 rounded-lg opacity-0">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="px-1.5 py-0.5 bg-[#f7768e] text-[#1a1b26] text-[8px] font-black rounded-sm uppercase">VIOLATION</span>
+                                    <span class="text-[#f7768e] font-bold text-[10px]">ACT 23a2a8 (WCAG 1.1.1)</span>
+                                </div>
+                                <p class="text-[#a9b1d6] text-[11px] leading-tight mb-3">Image missing alternative text.</p>
+                                <div class="font-mono text-[10px] bg-black/40 p-2 rounded border border-white/5 text-neon-cyan leading-none overflow-hidden">
+                                    &lt;img src="/logo.png" /&gt;
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="pt-4 text-[10px] text-slate-500 flex justify-between items-center opacity-50">
-                        <span>Analysis complete in 24ms</span>
-                        <span class="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">100% Deterministic</span>
+                    <!-- Status Bar -->
+                    <div class="bg-[#16161e] px-4 py-1 text-[9px] text-[#565f89] flex justify-between border-t border-white/5">
+                        <span>Analysis ID: snapshot-073bd8fb</span>
+                        <span class="text-neon-cyan opacity-80 uppercase font-black">56 files audited</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Floating USN Node -->
-            <div class="absolute -bottom-6 -right-6 hidden sm:block glass p-4 rounded-xl shadow-xl animate-bounce-slow">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-neon-emerald/20 flex items-center justify-center border border-neon-emerald/30">
-                        <span class="text-neon-emerald text-xl">⚓</span>
-                    </div>
-                    <div>
-                        <div class="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">USN Node Mapping</div>
-                        <div class="text-xs font-mono text-white">Role: button</div>
-                    </div>
+            <!-- Floating Badge -->
+            <div class="absolute -bottom-2 -right-2 hidden sm:flex bg-[#24283b] px-3 py-1.5 rounded-lg shadow-2xl border border-white/10 items-center gap-2 animate-float">
+                <div class="w-6 h-6 rounded bg-neon-cyan/10 flex items-center justify-center border border-neon-cyan/20 text-neon-cyan font-black text-[10px]">ACT</div>
+                <div class="text-[9px] font-mono text-white leading-none">
+                    <div class="text-[#565f89] font-bold uppercase text-[7px]">Standard</div>
+                    Verified
                 </div>
             </div>
         </div>
@@ -119,11 +136,46 @@
 </section>
 
 <style>
-    @keyframes bounce-slow {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
+    /* Sequence Animation for Tree View */
+    .tree-row {
+        animation: slideIn 0.5s ease-out forwards;
     }
-    .animate-bounce-slow {
-        animation: bounce-slow 4s ease-in-out infinite;
+    .tree-row:nth-child(1) { animation-delay: 0.2s; }
+    .tree-row:nth-child(2) { animation-delay: 0.4s; }
+    .tree-row:nth-child(3) { animation-delay: 0.6s; }
+    .tree-row:nth-child(4) { animation-delay: 0.8s; }
+    .tree-row:nth-child(5) { animation-delay: 1.0s; }
+    
+    .select-cursor {
+        animation: fadeIn 0.3s ease-out forwards;
+        animation-delay: 1.3s;
+    }
+
+    .detail-panel {
+        animation: detailIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        animation-delay: 1.5s;
+    }
+
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateX(-10px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes detailIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes float {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-10px) rotate(1deg); }
+    }
+    .animate-float {
+        animation: float 5s ease-in-out infinite;
     }
 </style>

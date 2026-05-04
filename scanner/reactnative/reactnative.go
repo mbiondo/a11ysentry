@@ -1,7 +1,6 @@
 package reactnative
 
 import (
-	"a11ysentry/engine/core/domain"
 	"a11ysentry/scanner"
 	"io/fs"
 	"os"
@@ -55,17 +54,35 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 	return scanner.ResolveImports(filePath, projectRoot, fileSet)
 }
 
-// BuildPageTrees groups all files into a single analysis unit for simplicity.
+// BuildPageTrees identifies top-level Screens/Components and builds their full import trees.
 func (f *Framework) BuildPageTrees(
 	allFiles []string,
 	importGraph map[string][]string,
 	projectRoot string,
 ) []scanner.PageTree {
+	importedByAnyone := make(map[string]bool)
+	for _, deps := range importGraph {
+		for _, dep := range deps {
+			importedByAnyone[dep] = true
+		}
+	}
+
 	var trees []scanner.PageTree
 	for _, file := range allFiles {
+		// Canonical React Native entry point detection:
+		// 1. Files not imported.
+		// 2. OR App.tsx/App.js or index.js/index.tsx
+		base := strings.ToLower(filepath.Base(file))
+		isAppRoot := base == "app.tsx" || base == "app.js" || base == "index.js" || base == "index.tsx"
+		
+		if importedByAnyone[file] && !isAppRoot {
+			continue
+		}
+		
+		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),
-			Root:  &domain.FileNode{FilePath: file},
+			Root:  root,
 		})
 	}
 	return trees

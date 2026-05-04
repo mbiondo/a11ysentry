@@ -4,6 +4,7 @@ package domain
 type FileNode struct {
 	FilePath string
 	Children []*FileNode
+	IsCycle  bool // true if this node points back to an ancestor, preventing infinite recursion
 }
 
 // Flatten returns a flat slice of all file paths in the tree.

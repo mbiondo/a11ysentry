@@ -30,8 +30,8 @@ name: a11ysentry-mcp
 description: >
   Expert guidance for auditing and fixing accessibility violations using the A11ySentry MCP server.
   Triggers: "check accessibility", "audit UI", "fix a11y", "WCAG compliance", or UI changes in PRs.
-allowed-tools: [analyze_accessibility, read_file, glob, grep_search]
-version: "1.2.0"
+allowed-tools: [analyze_accessibility, get_component_context, get_audit_history, read_file, glob, grep_search]
+version: "1.3.0"
 ---
 
 # A11ySentry Expert Skill
@@ -73,6 +73,10 @@ When violations are found:
   - ` + "`" + `msg` + "`" + `: Description of the issue.
   - ` + "`" + `fix` + "`" + `: Suggested fix.
 
+- ` + "`" + `get_component_context(path: string)` + "`" + `: Returns the architectural hierarchy (parents and children) of a component to provide better context for analysis.
+
+- ` + "`" + `get_audit_history(limit: number)` + "`" + `: Retrieves the last N accessibility reports from the local database.
+
 ## 📋 Examples
 
 ### Auditing a Full Project
@@ -80,11 +84,9 @@ If the user asks to check the entire project:
 1. Identify the project root directory.
 2. Run: ` + "`" + `analyze_accessibility(".")` + "`" + ` or ` + "`" + `analyze_accessibility("src/")` + "`" + `.
 
-### Auditing a Page (Legacy/Specific)
-If the user asks to check ` + "`" + `src/pages/index.astro` + "`" + ` and you want to be specific:
-1. Identify components used in ` + "`" + `index.astro` + "`" + ` (e.g., ` + "`" + `Header.astro` + "`" + `, ` + "`" + `Footer.astro` + "`" + `).
-2. Run: ` + "`" + `analyze_accessibility("src/pages/index.astro, src/components/Header.astro, src/components/Footer.astro")` + "`" + `.
-
+### Checking History
+If the user wants to see what has been audited recently:
+1. Run: ` + "`" + `get_audit_history(5)` + "`" + `.
 
 ### Fixing a contrast issue
 1. Tool reports ` + "`" + `WCAG_1_4_3` + "`" + ` (Contrast) in ` + "`" + `Button.tsx` + "`" + `.

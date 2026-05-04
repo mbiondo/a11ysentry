@@ -2,7 +2,9 @@ package dotnet
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"a11ysentry/scanner"
@@ -59,8 +61,40 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
+var (
+	razorImportRe = regexp.MustCompile(`(?m)@using\s+([\w.]+)`)
+)
+
 func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return []string{} // .NET typically uses global namespaces, not file imports
+	ext := strings.ToLower(filepath.Ext(filePath))
+	var resolved []string
+
+	// 1. Link XAML to Code-Behind
+	if ext == ".xaml" {
+		codeBehind := filePath + ".cs"
+		if fileSet[codeBehind] {
+			resolved = append(resolved, codeBehind)
+		}
+	}
+
+	// 2. Handle Razor @using imports (best effort)
+	if ext == ".razor" {
+		content, err := os.ReadFile(filePath)
+		if err == nil {
+			src := string(content)
+			matches := razorImportRe.FindAllStringSubmatch(src, -1)
+			for _, m := range matches {
+				pkgPath := strings.ReplaceAll(m[1], ".", string(filepath.Separator))
+				// Search in project root for matching folder/file
+				candidate := filepath.Join(projectRoot, pkgPath)
+				if fileSet[candidate+".razor"] {
+					resolved = append(resolved, candidate+".razor")
+				}
+			}
+		}
+	}
+
+	return resolved
 }
 
 func (f *Framework) BuildPageTrees(
@@ -68,9 +102,21 @@ func (f *Framework) BuildPageTrees(
 	importGraph map[string][]string,
 	projectRoot string,
 ) []scanner.PageTree {
+	importedByAnyone := make(map[string]bool)
+	for _, deps := range importGraph {
+		for _, dep := range deps {
+			importedByAnyone[dep] = true
+		}
+	}
+
 	var trees []scanner.PageTree
 	for _, file := range allFiles {
-		// Treat each file as a standalone tree for now
+		ext := strings.ToLower(filepath.Ext(file))
+		// Only XAML or top-level Razor files are likely page roots
+		if importedByAnyone[file] && ext != ".xaml" {
+			continue
+		}
+		
 		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),

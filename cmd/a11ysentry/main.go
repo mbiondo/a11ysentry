@@ -42,6 +42,7 @@ import (
 	pyqtfw "a11ysentry/scanner/pyqt"
 	electronfw "a11ysentry/scanner/electron"
 
+	"bufio"
 	"context"
 	"encoding/json"
 	"flag"
@@ -58,12 +59,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
+	"github.com/google/uuid"
 )
 
 var (
-	Version    = "0.0.6"
+	Version    = "0.0.8"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
+
+func setupRepository() ports.Repository {
+	homeDir, _ := os.UserHomeDir()
+	dbDir := filepath.Join(homeDir, ".a11ysentry")
+	_ = os.MkdirAll(dbDir, 0755)
+	repo, err := sqlite.NewSQLiteRepository(filepath.Join(dbDir, "history.db"))
+	if err != nil {
+		log.Fatalf("Error initializing database: %v", err)
+	}
+	return repo
+}
 
 func main() {
 	if len(os.Args) > 1 && (os.Args[1] == "--version" || os.Args[1] == "-v") {
@@ -81,6 +94,11 @@ func main() {
 		return
 	}
 
+	if len(os.Args) > 1 && os.Args[1] == "clear" {
+		handleClearSubcommand()
+		return
+	}
+
 	tuiFlag := flag.Bool("tui", false, "Start the interactive TUI dashboard")
 	formatFlag := flag.String("format", "text", "Output format: text, json, json-ld, sarif")
 	platformFlag := flag.String("platform", "", "Force platform: react, vue, svelte, angular, astro, android, ios, flutter, dotnet, reactnative, blazor, unity, godot, electron, tauri")
@@ -89,6 +107,7 @@ func main() {
 	cssFlag := flag.String("css", "", "Comma-separated list of external CSS/SCSS files to pre-load (for color resolution in single-file mode)")
 	outputFlag := flag.String("output", "", "Save results to a specific file (e.g. results.txt). If empty in project mode, defaults to date_project.txt")
 	watchFlag := flag.Bool("watch", false, "Watch input files for changes and re-analyze automatically")
+	linterFlag := flag.Bool("linter", false, "Run in Linter mode (JSON stream on stdin, project-aware analysis)")
 	flag.Parse()
 
 	// Load configuration
@@ -109,13 +128,7 @@ func main() {
 		cfg.Exclude = append(cfg.Exclude, strings.Split(*excludeFlag, ",")...)
 	}
 
-	homeDir, _ := os.UserHomeDir()
-	dbDir := filepath.Join(homeDir, ".a11ysentry")
-	_ = os.MkdirAll(dbDir, 0755)
-	repo, err := sqlite.NewSQLiteRepository(filepath.Join(dbDir, "history.db"))
-	if err != nil {
-		log.Fatalf("Error initializing database: %v", err)
-	}
+	repo := setupRepository()
 
 	projectRoot, _ := detectProjectRoot()
 	startTime := time.Now()
@@ -126,6 +139,11 @@ func main() {
 		if _, err := p.Run(); err != nil {
 			log.Fatalf("TUI Error: %v", err)
 		}
+		return
+	}
+
+	if *linterFlag {
+		runLinterMode(cfg, repo)
 		return
 	}
 
@@ -190,6 +208,7 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	}
 
 	projectName := filepath.Base(absDir)
+	runID := uuid.New().String()
 
 	// Discover project roots (handles monorepos / multi-project directories).
 	roots := scanner.FindProjectRoots(absDir, cfg.Exclude...)
@@ -199,10 +218,10 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	}
 	if cfg.Format == "text" {
 		if len(roots) > 1 {
-			fmt.Printf("A11ySentry -- Found %d project(s) in %s\n\n", len(roots), absDir)
+			fmt.Printf("A11ySentry -- Found %d project(s) in %s (RunID: %s)\n\n", len(roots), absDir, runID[:8])
 		} else {
 			// For single project, we still want the label if we are in text mode
-			fmt.Printf("A11ySentry -- Project: %s\n", absDir)
+			fmt.Printf("A11ySentry -- Project: %s (RunID: %s)\n", absDir, runID[:8])
 		}
 	}
 
@@ -211,7 +230,10 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	totalFiles := 0
 
 	for _, root := range roots {
-		errs, warns, reports, fileCount := analyzeProject(root, cfg, repo)
+		// Each project gets its own unique RunID per analysis session to prevent
+		// reports from being mixed in the TUI when analyzing multi-project folders.
+		projectRunID := uuid.New().String()
+		errs, warns, reports, fileCount := analyzeProject(root, cfg, repo, projectRunID)
 		allReports = append(allReports, reports...)
 		totalFiles += fileCount
 		if errs {
@@ -243,7 +265,7 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 	}
 }
 
-func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository) (hasErrors, hasWarnings bool, reports []domain.ViolationReport, fileCount int) {
+func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Repository, runID string) (hasErrors, hasWarnings bool, reports []domain.ViolationReport, fileCount int) {
 	// 1. Detect framework and collect files.
 	fw := scanner.Detect(absDir,
 		nextjs.New(),
@@ -365,11 +387,13 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			}
 
 			report := domain.ViolationReport{
+				RunID:       runID,
 				ProjectName: filepath.Base(absDir),
 				ProjectRoot: absDir,
 				FilePath:    tree.Label,
 				Platform:    platform,
 				Violations:  violations,
+				Hierarchy:   tree.Root,
 			}
 
 			// Persistence.
@@ -683,7 +707,8 @@ func handleMCPSubcommand(args []string) {
 		}
 	}
 
-	server.Start()
+	repo := setupRepository()
+	server.Start(repo)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -867,6 +892,155 @@ exit 0
 	return nil
 }
 
+func runLinterMode(cfg domain.ProjectConfig, repo ports.Repository) {
+	absRoot, _ := filepath.Abs(".")
+	fmt.Fprintf(os.Stderr, "A11ySentry Linter Engine starting in %s\n", absRoot)
+
+	// 1. Initial full scan to build context
+	fw := scanner.Detect(absRoot,
+		nextjs.New(), astrofw.New(), nuxt.New(), sveltekit.New(),
+		djangofw.New(), flaskfw.New(), angularfw.New(), vuefw.New(),
+		dotnetfw.New(), pyqtfw.New(), electronfw.New(), androidfw.New(),
+		iosfw.New(), flutterfw.New(), rnfw.New(), generic.New(),
+	)
+
+	fmt.Fprintf(os.Stderr, "  Framework detected: %s\n", fw.Name())
+
+	uiFiles, cssFiles, err := fw.CollectFiles(absRoot)
+	if err != nil {
+		log.Fatalf("Linter init error: %v", err)
+	}
+
+	importGraph := scanner.BuildImportGraph(uiFiles, fw, absRoot)
+	trees := fw.BuildPageTrees(uiFiles, importGraph, absRoot)
+	
+	// Map files to their containing trees for fast lookup
+	fileToTrees := make(map[string][]int)
+	for i, tree := range trees {
+		for _, f := range tree.Root.Flatten() {
+			fileToTrees[f] = append(fileToTrees[f], i)
+		}
+	}
+
+	fmt.Fprintf(os.Stderr, "  Context ready: %d files, %d trees. Waiting for input...\n", len(uiFiles), len(trees))
+
+	// 2. Read file paths from stdin and analyze
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		targetFile := scanner.Text()
+		if targetFile == "" {
+			continue
+		}
+
+		absTarget, err := filepath.Abs(targetFile)
+		if err != nil {
+			continue
+		}
+
+		// Re-scan only the target file to update import graph (simplified for now)
+		// A full implementation would update only the affected branch.
+		
+		treeIndices := fileToTrees[absTarget]
+		if len(treeIndices) == 0 {
+			// If file not in any tree, try analyzing it as a standalone unit
+			runStandaloneLinterAnalysis(absTarget, cfg, fw, cssFiles)
+			continue
+		}
+
+		// Analyze all trees affected by this file change
+		var allViolations []domain.Violation
+		for _, idx := range treeIndices {
+			violations := analyzeLinterTree(trees[idx], cfg, fw, cssFiles)
+			allViolations = append(allViolations, violations...)
+		}
+
+		// Deduplicate and output JSON
+		outputLinterResults(absTarget, allViolations)
+	}
+}
+
+func analyzeLinterTree(tree scanner.PageTree, cfg domain.ProjectConfig, fw scanner.ProjectFramework, cssFiles []string) []domain.Violation {
+	adapter := getAdapterForFramework(fw.Name())
+	
+	// Pre-load CSS
+	if !isMobileFramework(fw.Name()) {
+		allFiles := tree.Root.Flatten()
+		web.LoadProjectCSS(adapter, append(cssFiles, allFiles...))
+	}
+
+	usns, err := adapter.Ingest(context.Background(), tree.Root)
+	if err != nil {
+		return nil
+	}
+
+	analyzer := domain.NewAnalyzer()
+	violations, _ := analyzer.Analyze(context.Background(), usns, cfg)
+	return violations
+}
+
+func runStandaloneLinterAnalysis(path string, cfg domain.ProjectConfig, fw scanner.ProjectFramework, cssFiles []string) {
+	adapter := getAdapterForFramework(fw.Name())
+	if !isMobileFramework(fw.Name()) {
+		web.LoadProjectCSS(adapter, cssFiles)
+	}
+
+	node := &domain.FileNode{FilePath: path}
+	usns, err := adapter.Ingest(context.Background(), node)
+	if err != nil {
+		return
+	}
+
+	analyzer := domain.NewAnalyzer()
+	violations, _ := analyzer.Analyze(context.Background(), usns, cfg)
+	outputLinterResults(path, violations)
+}
+
+func outputLinterResults(filePath string, violations []domain.Violation) {
+	result := struct {
+		FilePath   string             `json:"file"`
+		Violations []domain.Violation `json:"violations"`
+	}{
+		FilePath:   filePath,
+		Violations: violations,
+	}
+	out, _ := json.Marshal(result)
+	fmt.Println(string(out))
+}
+
+func getAdapterForFramework(name string) ports.Adapter {
+	switch name {
+	case "Android (Kotlin/Java)":
+		return android.NewAndroidAdapter()
+	case "iOS (Swift/SwiftUI)":
+		return ios.NewIOSAdapter()
+	case "Flutter (Dart)":
+		return flutter.NewFlutterAdapter()
+	case "React Native (TSX/JSX)":
+		return reactnative.NewReactNativeAdapter()
+	case "Django":
+		return django.NewDjangoAdapter()
+	case "Flask":
+		return flask.NewFlaskAdapter()
+	case "Angular":
+		return angular.NewAngularAdapter()
+	case "Vue":
+		return vue.NewVueAdapter()
+	case "DotNet":
+		return dotnet.NewDotNetAdapter()
+	case "PyQt":
+		return pyqt.NewPyQtAdapter()
+	case "Electron":
+		return electron.NewElectronAdapter()
+	default:
+		return web.NewHTMLAdapter()
+	}
+}
+
+func isMobileFramework(name string) bool {
+	return name == "Android (Kotlin/Java)" || name == "iOS (Swift/SwiftUI)" ||
+		name == "Flutter (Dart)" || name == "React Native (TSX/JSX)"
+}
+
 func fileExists(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
@@ -877,10 +1051,31 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
+func handleClearSubcommand() {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatalf("Error: could not find home directory: %v", err)
+	}
+	dbPath := filepath.Join(homeDir, ".a11ysentry", "history.db")
+
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		fmt.Println("No history database found. Nothing to clear.")
+		return
+	}
+
+	err = os.Remove(dbPath)
+	if err != nil {
+		log.Fatalf("Error: could not clear history: %v", err)
+	}
+
+	fmt.Println("Successfully cleared analysis history.")
+}
+
 func printUsage() {
 	fmt.Printf("A11ySentry version %s\n\n", Version)
 	fmt.Println("Usage:")
 	fmt.Println("  a11ysentry init                  Scaffold CI/CD: GitHub Actions, pre-commit hook, config")
+	fmt.Println("  a11ysentry clear                 Reset analysis history (deletes database)")
 	fmt.Println("  a11ysentry <file1> <file2>        Analyze files directly")
 	fmt.Println("  a11ysentry --dir ./src            Analyze a full project directory")
 	fmt.Println("  a11ysentry --exclude node_modules Comma-separated list of directories to skip")

@@ -5,6 +5,34 @@ All notable changes to A11ySentry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.0.8] - 2026-05-04
+
+### Added
+- **MCP Persistence**: Integrated SQLite repository into the Model Context Protocol server.
+- **MCP History Tool**: New `get_audit_history` tool for agents to query past analysis.
+- **Nearest Root Discovery**: Improved scanner to find the nearest project root upwards from any file.
+
+## [0.0.7] - 2026-05-04
+
+### Added
+- **Modular Rule Engine**: Refactored monolithic analyzer into independent, parallelized rule strategies.
+- **Formal CSS Engine**: Integrated `tdewolff/parse` for robust CSS variable and `@media` resolution.
+- **W3C ACT Compliance**: Mapped all core rules to official Accessibility Conformance Testing IDs.
+- **Component Explorer (TUI)**: New hierarchical tree view for navigating project architectures.
+- **Analysis Snapshots**: Session-based history management via `RunID` to prevent data pollution.
+- **A11y-Ignore**: Support for inline error suppression via `<!-- a11y-ignore -->` comments.
+- **Context-Aware Linter**: New `--linter` mode for real-time IDE integration with PageTree awareness.
+- **Advanced Resolvers**: Canonical dependency resolution for Angular, Django, Flutter, and iOS.
+- **CLI Maintenance**: Added `clear` subcommand to reset analysis history.
+
+### Changed
+- **TUI**: Redesigned dashboard with color-coded health status and multi-tree support.
+- **Persistence**: Migrated SQLite schema to support hierarchical PageTree snapshots.
+
+### Fixed
+- **Cycle Detection**: Resolved 'file not found' errors in projects with circular dependencies.
+- **Code Quality**: Fixed multiple linting issues and dead code identified by `golangci-lint`.
+
 ## [0.0.6] - 2026-05-03
 
 ### Added

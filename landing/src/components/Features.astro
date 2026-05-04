@@ -1,45 +1,57 @@
 ---
 const features = [
-    {
-        icon: "💰",
-        title: "Predictable Cost",
-        description: "Zero token fees. Run unlimited audits locally without burning your API budget.",
-        color: "text-neon-cyan"
-    },
-    {
-        icon: "🧠",
-        title: "Zero Hallucinations",
-        description: "Pure engineering logic based on WCAG 2.2 specs. No probabilistic guesswork.",
-        color: "text-neon-emerald"
-    },
-    {
-        icon: "🔒",
-        title: "Air-Gapped Privacy",
-        description: "Your source code never leaves your infrastructure. 100% corporate-ready.",
-        color: "text-purple-400"
-    },
-    {
-        icon: "⚡",
-        title: "Native Speed",
-        description: "Analyze thousands of component nodes in milliseconds with our Go engine.",
-        color: "text-amber-400"
-    }
+  {
+    title: "Component Tree Engine",
+    description: "Goes beyond file analysis. A11ySentry reconstructs the full rendering hierarchy (PageTrees) to audit inheritance, context, and shared dependencies.",
+    icon: "🌳",
+    color: "from-neon-cyan/20 to-neon-cyan/5"
+  },
+  {
+    title: "W3C ACT Standardized",
+    description: "Every rule is mapped to official W3C Accessibility Conformance Testing IDs (e.g. 23a2a8), ensuring industry-standard auditing for your team.",
+    icon: "📜",
+    color: "from-neon-emerald/20 to-neon-emerald/5"
+  },
+  {
+    title: "Analysis Snapshots",
+    description: "Every run is a clean 'Snapshot'. Track progress across sessions without stale data pollution, perfect for managing complex technical debt.",
+    icon: "📸",
+    color: "from-purple-500/20 to-purple-500/5"
+  },
+  {
+    title: "Formal CSS Resolution",
+    description: "Features a full CSS parser (tdewolff) to resolve variables and @media queries accurately, eliminating false positives in contrast checks.",
+    icon: "🎨",
+    color: "from-orange-500/20 to-orange-500/5"
+  },
+  {
+    title: "A11y-Ignore System",
+    description: "Suppress specific violations directly in your markup via comments. Move fast while documenting known accessibility tradeoffs.",
+    icon: "🔇",
+    color: "from-blue-500/20 to-blue-500/5"
+  },
+  {
+    title: "Multi-Platform USN",
+    description: "Audit Web, Android, iOS, Flutter, and Desktop with a unified Universal Semantic Node model. One tool for your entire engineering stack.",
+    icon: "📱",
+    color: "from-pink-500/20 to-pink-500/5"
+  }
 ];
 ---
-<section id="features" class="py-24 bg-slate-900/30">
-    <div class="max-w-7xl mx-auto px-6">
-        <div class="text-center mb-16 space-y-4">
-            <h2 class="text-3xl md:text-5xl font-bold tracking-tight">Built for modern <span class="text-neon-emerald">assurance.</span></h2>
-            <p class="text-slate-400 max-w-2xl mx-auto">The deterministic alternative to AI-based accessibility testing.</p>
+
+<section id="features" class="py-24 px-6 relative" aria-label="Key Features">
+    <div class="max-w-7xl mx-auto space-y-16">
+        <div class="text-center space-y-4">
+            <h2 class="text-[10px] font-bold uppercase tracking-[0.3em] text-neon-cyan">The A11ySentry Difference</h2>
+            <p class="text-3xl md:text-5xl font-black tracking-tight">Built for <span class="text-neon-emerald">Professional</span> Engineering.</p>
         </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map(f => (
-                <div class="glass p-8 rounded-2xl group hover:border-neon-cyan/50 transition-all duration-500 relative overflow-hidden focus-within:ring-2 focus-within:ring-neon-cyan">
-                    <div class="absolute -top-10 -right-10 w-24 h-24 bg-neon-cyan/5 blur-3xl rounded-full group-hover:bg-neon-cyan/10 transition-colors"></div>
-                    <div class={`text-4xl mb-6 ${f.color}`}>{f.icon}</div>
+                <div class={`p-8 rounded-[2rem] bg-gradient-to-br ${f.color} border border-white/5 hover:border-white/10 transition-all duration-300 group`}>
+                    <div class="text-4xl mb-6 group-hover:scale-110 transition-transform duration-300">{f.icon}</div>
                     <h3 class="text-xl font-bold mb-3 text-white">{f.title}</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">{f.description}</p>
+                    <p class="text-slate-400 leading-relaxed text-sm">{f.description}</p>
                 </div>
             ))}
         </div>

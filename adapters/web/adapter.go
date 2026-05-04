@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/tdewolff/parse/v2"
+	"github.com/tdewolff/parse/v2/css"
 	"golang.org/x/net/html"
 )
 
@@ -20,6 +22,7 @@ type htmlAdapter struct {
 	darkCSSMap   map[string]map[string]string // dark-mode overrides: className -> property -> value
 	customColors map[string]string            // Tailwind custom token name -> hex (resolved from CSS files)
 	cssVars      map[string]string            // CSS custom property name (--foo) -> hex
+	darkCSSVars  map[string]string            // CSS custom properties for dark mode
 }
 
 func NewHTMLAdapter() ports.Adapter {
@@ -29,6 +32,7 @@ func NewHTMLAdapter() ports.Adapter {
 		darkCSSMap:   make(map[string]map[string]string),
 		customColors: make(map[string]string),
 		cssVars:      make(map[string]string),
+		darkCSSVars:  make(map[string]string),
 	}
 }
 
@@ -39,6 +43,7 @@ func NewElectronAdapter() ports.Adapter {
 		darkCSSMap:   make(map[string]map[string]string),
 		customColors: make(map[string]string),
 		cssVars:      make(map[string]string),
+		darkCSSVars:  make(map[string]string),
 	}
 }
 
@@ -49,6 +54,7 @@ func NewTauriAdapter() ports.Adapter {
 		darkCSSMap:   make(map[string]map[string]string),
 		customColors: make(map[string]string),
 		cssVars:      make(map[string]string),
+		darkCSSVars:  make(map[string]string),
 	}
 }
 
@@ -56,19 +62,20 @@ func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]doma
 	if root == nil {
 		return nil, nil
 	}
-	// Initial ingestion starts with no inherited context.
 	return a.ingestRecursive(ctx, root, "", "", false)
 }
 
 func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string, inheritedHidden bool) ([]domain.USN, error) {
+	if node.IsCycle {
+		// Stop processing cycles to avoid redundant work and errors.
+		return nil, nil
+	}
 	data, err := os.ReadFile(node.FilePath)
 	if err != nil {
 		return nil, err
 	}
 	content := string(data)
 
-	// Strip Astro/Markdown frontmatter (--- ... ---)
-	// We replace it with newlines to preserve line numbers.
 	cleanContent := content
 	if strings.HasPrefix(content, "---") {
 		endIdx := strings.Index(content[3:], "---")
@@ -79,11 +86,8 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 		}
 	}
 
-	// Detect if this file is a full HTML document or a partial component.
-	// If it's a Page Tree root, we should NOT treat it as a component.
 	isComponent := !strings.Contains(strings.ToLower(cleanContent), "<html")
 	if inheritedBG == "" && inheritedFG == "" {
-		// Heuristic: if no context inherited, it's likely a root document.
 		isComponent = false
 	}
 
@@ -92,14 +96,10 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 		return nil, err
 	}
 
-	// Pass 1: Extract CSS from this file
 	a.extractCSS(doc)
 
-	// Pass 2: Traverse this file with inherited context from parent file
 	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG, inheritedHidden)
 
-	// Determine the effective background and foreground to propagate to children files.
-	// We look for the most specific colors defined in the current file.
 	childBG := inheritedBG
 	childFG := inheritedFG
 	childHidden := inheritedHidden
@@ -118,7 +118,6 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 	var allNodes []domain.USN
 	allNodes = append(allNodes, nodes...)
 
-	// Recursively ingest children (imported components or nested layouts)
 	for _, child := range node.Children {
 		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG, childHidden)
 		if err != nil {
@@ -145,33 +144,116 @@ func (a *htmlAdapter) extractCSS(n *html.Node) {
 	}
 }
 
-func (a *htmlAdapter) parseCSS(css string) {
-	a.parseCSSInto(css, a.cssMap)
+func (a *htmlAdapter) parseCSS(cssStr string) {
+	a.processCSS(cssStr, a.cssMap, false)
 }
 
-func (a *htmlAdapter) parseDarkCSS(css string) {
-	a.parseCSSInto(css, a.darkCSSMap)
-}
+func (a *htmlAdapter) processCSS(cssStr string, target map[string]map[string]string, isDark bool) {
+	p := css.NewParser(parse.NewInputString(cssStr), false)
+	var currentSelectors []string
+	inDarkMedia := isDark
 
-func (a *htmlAdapter) parseCSSInto(css string, target map[string]map[string]string) {
-	// Simple regex parser for .class { prop: val; }
-	re := regexp.MustCompile(`\.([a-zA-Z0-9_-]+)\s*\{([^}]+)\}`)
-	matches := re.FindAllStringSubmatch(css, -1)
-
-	for _, m := range matches {
-		className := m[1]
-		rules := m[2]
-
-		if _, ok := target[className]; !ok {
-			target[className] = make(map[string]string)
+	for {
+		gt, _, data := p.Next()
+		if gt == css.ErrorGrammar {
+			break
 		}
 
-		propRe := regexp.MustCompile(`(color|background-color|border-color)\s*:\s*([^;]+)`)
-		pMatches := propRe.FindAllStringSubmatch(rules, -1)
-		for _, pm := range pMatches {
-			target[className][strings.TrimSpace(pm[1])] = strings.TrimSpace(pm[2])
+		switch gt {
+		case css.AtRuleGrammar, css.BeginAtRuleGrammar:
+			name := strings.TrimPrefix(strings.ToLower(string(data)), "@")
+			if name == "media" {
+				var b strings.Builder
+				for _, v := range p.Values() {
+					b.Write(v.Data)
+				}
+				prelude := b.String()
+				if strings.Contains(prelude, "prefers-color-scheme") && strings.Contains(prelude, "dark") {
+					inDarkMedia = true
+				}
+			}
+		case css.EndAtRuleGrammar:
+			inDarkMedia = isDark
+		case css.BeginRulesetGrammar:
+			currentSelectors = nil
+			var b strings.Builder
+			for _, v := range p.Values() {
+				b.Write(v.Data)
+			}
+			rawSelectors := b.String()
+			for _, s := range strings.Split(rawSelectors, ",") {
+				sel := strings.TrimSpace(s)
+				if sel == ":root" || sel == "@theme" || strings.HasPrefix(sel, ":root") {
+					currentSelectors = append(currentSelectors, ":root")
+				} else if strings.HasPrefix(sel, ".") {
+					currentSelectors = append(currentSelectors, strings.TrimPrefix(sel, "."))
+				}
+			}
+		case css.DeclarationGrammar, css.CustomPropertyGrammar:
+			prop := strings.TrimSpace(string(data))
+			var b strings.Builder
+			for _, v := range p.Values() {
+				b.Write(v.Data)
+			}
+			val := strings.TrimSpace(b.String())
+
+			if strings.HasPrefix(prop, "--") || gt == css.CustomPropertyGrammar {
+				vMap := a.cssVars
+				if inDarkMedia {
+					vMap = a.darkCSSVars
+				}
+				vMap[prop] = val
+				if hex := a.normalizeColor(val); hex != "" {
+					if strings.HasPrefix(prop, "--color-") {
+						a.customColors[strings.TrimPrefix(prop, "--color-")] = hex
+					}
+				}
+				continue
+			}
+
+			if len(currentSelectors) == 0 {
+				continue
+			}
+			if prop != "color" && prop != "background-color" && prop != "border-color" {
+				continue
+			}
+
+			currentTarget := target
+			if inDarkMedia {
+				currentTarget = a.darkCSSMap
+			}
+
+			for _, sel := range currentSelectors {
+				if sel == ":root" {
+					continue
+				}
+				if _, ok := currentTarget[sel]; !ok {
+					currentTarget[sel] = make(map[string]string)
+				}
+				currentTarget[sel][prop] = val
+			}
 		}
 	}
+}
+
+func (a *htmlAdapter) resolveVar(val string) string {
+	val = strings.TrimSpace(val)
+	if strings.HasPrefix(val, "var(") {
+		inner := strings.TrimSuffix(strings.TrimPrefix(val, "var("), ")")
+		key := strings.TrimSpace(inner)
+		if strings.Contains(key, ",") {
+			parts := strings.Split(key, ",")
+			key = strings.TrimSpace(parts[0])
+		}
+		if res, ok := a.cssVars[key]; ok {
+			return a.resolveVar(res)
+		}
+		if strings.Contains(inner, ",") {
+			parts := strings.Split(inner, ",")
+			return a.resolveVar(strings.TrimSpace(parts[1]))
+		}
+	}
+	return val
 }
 
 func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fullContent string, isComponent bool, inheritedBG string, inheritedFG string, inheritedHidden bool) []domain.USN {
@@ -181,18 +263,39 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		raw := a.renderNode(n)
 		line, col := a.findPosition(n, fullContent)
 
+		// Check for preceding comments to support a11y-ignore
+		var ignoredRules []string
+		for prev := n.PrevSibling; prev != nil; prev = prev.PrevSibling {
+			// Skip whitespace text nodes to find adjacent comments
+			if prev.Type == html.TextNode && strings.TrimSpace(prev.Data) == "" {
+				continue
+			}
+			if prev.Type == html.CommentNode {
+				comment := strings.TrimSpace(prev.Data)
+				if strings.HasPrefix(comment, "a11y-ignore:") {
+					rulesPart := strings.TrimPrefix(comment, "a11y-ignore:")
+					for _, r := range strings.Split(rulesPart, ",") {
+						ignoredRules = append(ignoredRules, strings.TrimSpace(r))
+					}
+				}
+			}
+			// Only look at the immediate preceding non-whitespace node
+			break
+		}
+
 		usn := domain.USN{
 			UID:    a.getAttribute(n, "id"),
 			Role:   a.mapRole(n.Data),
 			Label:  a.getLabel(n),
 			Traits: make(map[string]any),
 			Source: domain.Source{
-				Platform:    a.platform,
-				FilePath:    filename,
-				Line:        line,
-				Column:      col,
-				RawHTML:     raw,
-				IsComponent: isComponent,
+				Platform:     a.platform,
+				FilePath:     filename,
+				Line:         line,
+				Column:       col,
+				RawHTML:      raw,
+				IsComponent:  isComponent,
+				IgnoredRules: ignoredRules,
 			},
 		}
 
@@ -200,7 +303,6 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 			usn.Traits["aria-hidden-inherited"] = true
 		}
 
-		// 0. Override Role if explicit ARIA role is present
 		if ariaRole := a.getAttribute(n, "role"); ariaRole != "" {
 			switch ariaRole {
 			case "button":
@@ -235,19 +337,17 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 			usn.UID = n.Data
 		}
 
-		// 1. Merge CSS Class Traits (Lower priority)
 		if classAttr := a.getAttribute(n, "class"); classAttr != "" {
 			classes := strings.Fields(classAttr)
 			for _, c := range classes {
 				if props, ok := a.cssMap[c]; ok {
 					for k, v := range props {
-						usn.Traits[k] = v
+						usn.Traits[k] = a.resolveVar(v)
 					}
 				}
 			}
 		}
 
-		// 2. Map direct attributes and inline styles (Higher priority override)
 		for _, attr := range n.Attr {
 			if attr.Key == "id" || attr.Key == "lang" || attr.Key == "type" || attr.Key == "class" || attr.Key == "className" || attr.Key == "for" ||
 				attr.Key == "aria-pressed" || attr.Key == "aria-expanded" || attr.Key == "aria-checked" || attr.Key == "role" ||
@@ -260,23 +360,16 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				usn.Traits[attr.Key] = attr.Val
 			}
 
-			// React JSX: htmlFor → for (for label association).
-			// Note: HTML parsers lowercase all attributes, so htmlFor becomes htmlfor.
 			if attr.Key == "htmlfor" && attr.Val != "" {
 				usn.Traits["htmlFor"] = attr.Val
 			}
-			// Angular/Vue template bindings: [attr]="expr" means the value is dynamic (bound).
-			// The parser sees [alt] as a literal key with a binding expression as value.
-			// Treat any [alt] or [attr.alt] as "label is bound dynamically" — skip empty-alt violation.
 			if (attr.Key == "[alt]" || attr.Key == "v-bind:alt" || attr.Key == ":alt" || attr.Key == "[attr.alt]") && attr.Val != "" {
-				usn.Label = "{{" + attr.Val + "}}" // mark as dynamically bound
+				usn.Label = "{{" + attr.Val + "}}"
 			}
 
-			// Tailwind / Utility-first heuristics
 			if attr.Key == "class" || attr.Key == "className" {
 				classes := strings.Fields(attr.Val)
 				for _, c := range classes {
-					// Spacing (w-12, h-4, etc) -> 1 unit = 4px
 					if strings.HasPrefix(c, "w-") {
 						var val float64
 						if _, err := fmt.Sscanf(c, "w-%f", &val); err == nil {
@@ -289,10 +382,6 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 							usn.Traits["height"] = val * 4
 						}
 					}
-					// Colors (text-red-500, bg-slate-900) — only set if resolved.
-					// If mapTailwindColor returns "" the color is unknown; we must NOT
-					// set the trait so the contrast rule skips the element instead of
-					// producing a false-positive 1.00:1 ratio.
 					if strings.HasPrefix(c, "text-") {
 						if hex := a.mapTailwindColor(c); hex != "" {
 							usn.Traits["color"] = hex
@@ -308,11 +397,9 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 							usn.Traits["border-color"] = hex
 						}
 					}
-					// WCAG 1.4.1: no-underline class on links removes text-decoration.
 					if c == "no-underline" {
 						usn.Traits["no-underline"] = true
 					}
-					// Dark mode Tailwind classes: dark:bg-*, dark:text-*
 					if strings.HasPrefix(c, "dark:text-") {
 						if hex := a.mapTailwindColor("text-" + strings.TrimPrefix(c, "dark:text-")); hex != "" {
 							usn.Traits["dark:color"] = hex
@@ -325,8 +412,6 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 					}
 				}
 			}
-
-
 
 			if attr.Key == "style" {
 				parts := strings.Split(attr.Val, ";")
@@ -345,10 +430,8 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 								usn.Traits[key] = hex
 							}
 						} else if strings.HasPrefix(val, "var(") {
-							// Resolve CSS custom property if we've loaded external CSS.
-							inner := strings.TrimSuffix(strings.TrimPrefix(val, "var("), ")")
-							if hex, ok := a.cssVars[strings.TrimSpace(inner)]; ok {
-								usn.Traits[key] = hex
+							if res := a.resolveVar(val); res != val {
+								usn.Traits[key] = res
 							}
 						}
 					}
@@ -356,15 +439,9 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 			}
 		}
 
-		// Apply inherited background-color if this node doesn't have its own.
-		// CSS background-color is not inherited by default, but for contrast analysis
-		// we need the effective background a child is rendered on.
 		if _, hasBG := usn.Traits["background-color"]; !hasBG && inheritedBG != "" {
 			usn.Traits["background-color"] = inheritedBG
 		}
-		// CSS `color` IS inherited. Propagate the parent's foreground color when the
-		// element doesn't declare one explicitly, so contrast checks can fire correctly
-		// for children of e.g. <body class="text-white">.
 		if _, hasFG := usn.Traits["color"]; !hasFG && inheritedFG != "" {
 			usn.Traits["color"] = inheritedFG
 		}
@@ -372,7 +449,6 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		nodes = append(nodes, usn)
 	}
 
-	// Determine the background-color and color to propagate to children.
 	childBG := inheritedBG
 	childFG := inheritedFG
 	childHidden := inheritedHidden
@@ -434,7 +510,6 @@ func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
 }
 
 func (a *htmlAdapter) getLabel(n *html.Node) string {
-	// 1. Check aria-label or alt (highest priority — explicit accessible name)
 	for _, attr := range n.Attr {
 		if attr.Key == "aria-label" || attr.Key == "alt" || attr.Key == ":alt" || attr.Key == "bind:alt" || attr.Key == "v-bind:alt" || attr.Key == "[alt]" || attr.Key == "[attr.alt]" || attr.Key == "[attr.aria-label]" {
 			if strings.TrimSpace(attr.Val) != "" {
@@ -446,9 +521,6 @@ func (a *htmlAdapter) getLabel(n *html.Node) string {
 		}
 	}
 
-	// 2. For text-bearing elements, capture their direct text content.
-	// This includes headings, interactive elements, and inline text elements
-	// (p, span, label, legend, caption) so that contrast checks are triggered.
 	switch n.Data {
 	case "button", "a",
 		"h1", "h2", "h3", "h4", "h5", "h6",
@@ -485,7 +557,6 @@ func (a *htmlAdapter) getAttribute(n *html.Node, key string) string {
 
 func (a *htmlAdapter) renderNode(n *html.Node) string {
 	var buf bytes.Buffer
-	// We only want the start tag for better UX in reports
 	buf.WriteString("<" + n.Data)
 	for _, attr := range n.Attr {
 		fmt.Fprintf(&buf, " %s=\"%s\"", attr.Key, attr.Val)
@@ -495,45 +566,11 @@ func (a *htmlAdapter) renderNode(n *html.Node) string {
 }
 
 func (a *htmlAdapter) findPosition(n *html.Node, fullContent string) (int, int) {
-	// Attempt to find the tag in the source more robustly.
-	// 1. Try exact match of a reconstructed start tag (best effort).
 	raw := a.renderNode(n)
 	idx := strings.Index(fullContent, raw)
-	
-	// 2. If exact match fails, try a fuzzy match based on tag name and key attributes.
 	if idx == -1 {
 		tagName := n.Data
-		var patterns []string
-		patterns = append(patterns, "<"+tagName)
-		
-		// Add some attributes to the search pattern if available
-		for _, attr := range n.Attr {
-			// Skip attributes that might be transformed or are too common
-			if attr.Key == "class" || attr.Key == "id" || attr.Key == "src" || attr.Key == "href" {
-				val := regexp.QuoteMeta(attr.Val)
-				patterns = append(patterns, fmt.Sprintf("%s\\s*=\\s*['\"]%s['\"]", attr.Key, val))
-			}
-		}
-		
-		// Build a regex that matches the tag name and at least one identifying attribute
-		if len(patterns) > 1 {
-			for i := 1; i < len(patterns); i++ {
-				rePattern := "(?i)" + patterns[0] + "[^>]*" + patterns[i]
-				re, err := regexp.Compile(rePattern)
-				if err == nil {
-					loc := re.FindStringIndex(fullContent)
-					if loc != nil {
-						idx = loc[0]
-						break
-					}
-				}
-			}
-		}
-		
-		// 3. Fallback to just the first occurrence of the tag name if still not found
-		if idx == -1 {
-			idx = strings.Index(fullContent, "<"+tagName)
-		}
+		idx = strings.Index(fullContent, "<"+tagName)
 	}
 
 	if idx == -1 {
@@ -553,13 +590,6 @@ func (a *htmlAdapter) findPosition(n *html.Node, fullContent string) (int, int) 
 	return line, col
 }
 
-// LoadProjectCSS feeds external CSS/SCSS files into the adapter so that
-// custom color tokens and CSS custom properties are available when Ingest
-// is called. It is a no-op if the adapter is not an *htmlAdapter.
-// Intended for --dir mode in the CLI where standalone CSS files exist.
-//
-// It also scans JS/TS/TSX/JSX files in the same list for CSS-in-JS patterns
-// (styled-components, emotion css“, etc.) using a best-effort heuristic.
 func LoadProjectCSS(adapter ports.Adapter, cssFiles []string) {
 	ha, ok := adapter.(*htmlAdapter)
 	if !ok {
@@ -572,7 +602,6 @@ func LoadProjectCSS(adapter ports.Adapter, cssFiles []string) {
 			_ = ha.LoadExternalCSS(f)
 		case strings.HasSuffix(lower, ".js") || strings.HasSuffix(lower, ".ts") ||
 			strings.HasSuffix(lower, ".jsx") || strings.HasSuffix(lower, ".tsx"):
-			// Check for tailwind.config.js / tailwind.config.ts first.
 			base := strings.ToLower(filepath.Base(f))
 			if base == "tailwind.config.js" || base == "tailwind.config.ts" || base == "tailwind.config.mjs" {
 				_ = ha.LoadTailwindConfig(f)
@@ -583,80 +612,22 @@ func LoadProjectCSS(adapter ports.Adapter, cssFiles []string) {
 	}
 }
 
-// LoadExternalCSS parses an external CSS or SCSS file and extracts:
-//  1. CSS custom properties (--foo: #hex) → cssVars
-//  2. Class-level color declarations → cssMap
-//  3. Tailwind v4 @theme blocks (--color-*: #hex) → customColors
-//
-// This should be called before Ingest() when using --dir mode so that
-// contrast checks can resolve tokens defined in standalone CSS files.
 func (a *htmlAdapter) LoadExternalCSS(filepath string) error {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		return err
 	}
-	css := string(data)
-
-	// Parse CSS custom properties at root / :root / @theme scope.
-	// Matches: --color-primary: #1a2b3c;  or  --brand: rgb(10,20,30);
-	varRe := regexp.MustCompile(`--([\w-]+)\s*:\s*([^;}\n]+)`)
-	for _, m := range varRe.FindAllStringSubmatch(css, -1) {
-		name := strings.TrimSpace(m[1])
-		val := strings.TrimSpace(m[2])
-		hex := a.normalizeColor(val)
-		if hex == "" {
-			continue
-		}
-		a.cssVars["--"+name] = hex
-
-		// Tailwind v4 convention: --color-<name> maps to the Tailwind token <name>.
-		// e.g. --color-primary → customColors["primary"] = hex
-		// e.g. --color-brand-500 → customColors["brand-500"] = hex
-		if strings.HasPrefix(name, "color-") {
-			token := strings.TrimPrefix(name, "color-")
-			a.customColors[token] = hex
-		}
-	}
-
-	// Resolve any CSS-var references now that we have the var map.
-	for k, v := range a.cssVars {
-		if strings.HasPrefix(v, "var(") {
-			inner := strings.TrimSuffix(strings.TrimPrefix(v, "var("), ")")
-			if resolved, ok := a.cssVars[strings.TrimSpace(inner)]; ok {
-				a.cssVars[k] = resolved
-			}
-		}
-	}
-
-	// Also parse regular class rules (same as inline <style> parsing).
-	a.parseCSS(css)
-
-	// Extract @media (prefers-color-scheme: dark) { ... } blocks and parse them
-	// as dark-mode overrides stored in darkCSSMap.
-	darkRe := regexp.MustCompile(`(?s)@media\s*\(\s*prefers-color-scheme\s*:\s*dark\s*\)\s*\{(.+?)\}(?:\s*\})`)
-	for _, dm := range darkRe.FindAllStringSubmatch(css, -1) {
-		a.parseDarkCSS(dm[1])
-	}
-
+	cssStr := string(data)
+	a.processCSS(cssStr, a.cssMap, false)
 	return nil
 }
 
-// LoadTailwindConfig parses a tailwind.config.js / .ts file and extracts custom
-// color tokens defined in theme.colors or theme.extend.colors.
-// Uses best-effort regex-based JS parsing (no AST).
-//
-// Supports the patterns:
-//
-//	colors: { brand: '#1a2b3c', primary: { DEFAULT: '#fff', 500: '#abc' } }
 func (a *htmlAdapter) LoadTailwindConfig(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
 	content := string(data)
-
-	// Match  'tokenName': '#hexvalue'  or  "tokenName": "#hexvalue"
-	// Covers both string and numeric sub-keys (e.g. 500: '#...').
 	tokenRe := regexp.MustCompile(`['"]?([\w-]+)['"]?\s*:\s*['"](#[0-9a-fA-F]{3,8})['"]`)
 	matches := tokenRe.FindAllStringSubmatch(content, -1)
 	for _, m := range matches {
@@ -665,7 +636,6 @@ func (a *htmlAdapter) LoadTailwindConfig(path string) error {
 		if hex == "" {
 			continue
 		}
-		// Skip common non-color keys.
 		switch name {
 		case "default", "content", "screens", "spacing", "fontsize", "borderradius":
 			continue
@@ -675,10 +645,6 @@ func (a *htmlAdapter) LoadTailwindConfig(path string) error {
 	return nil
 }
 
-// normalizeColor converts common CSS color formats to lowercase hex.
-// Supports: #rrggbb, #rgb, #rrggbbaa, #rgba, rgb(r,g,b), rgba(r,g,b,a).
-// Alpha channels are composited over white (255,255,255) for contrast analysis.
-// Returns "" if unrecognized.
 func (a *htmlAdapter) normalizeColor(val string) string {
 	val = strings.TrimSpace(val)
 	if strings.HasPrefix(val, "#") {
@@ -688,7 +654,7 @@ func (a *htmlAdapter) normalizeColor(val string) string {
 		case 4: // #rgb → #rrggbb
 			r, g, b := val[1:2], val[2:3], val[3:4]
 			return "#" + r + r + g + g + b + b
-		case 9: // #rrggbbaa → composite over white
+		case 9: // #rrggbbaa
 			var r, g, b, aa int
 			if n, _ := fmt.Sscanf(val[1:], "%02x%02x%02x%02x", &r, &g, &b, &aa); n == 4 {
 				alpha := float64(aa) / 255.0
@@ -697,7 +663,7 @@ func (a *htmlAdapter) normalizeColor(val string) string {
 				b = int(float64(b)*alpha + 255*(1-alpha))
 				return fmt.Sprintf("#%02x%02x%02x", r, g, b)
 			}
-		case 5: // #rgba → composite over white
+		case 5: // #rgba
 			rs, gs, bs, as_ := val[1:2], val[2:3], val[3:4], val[4:5]
 			var r, g, b, aa int
 			if n, _ := fmt.Sscanf(rs+rs+gs+gs+bs+bs+as_+as_, "%02x%02x%02x%02x", &r, &g, &b, &aa); n == 4 {
@@ -710,7 +676,6 @@ func (a *htmlAdapter) normalizeColor(val string) string {
 		}
 	}
 	if strings.HasPrefix(val, "rgb(") {
-		// rgb(r, g, b)
 		inner := strings.TrimSuffix(strings.TrimPrefix(val, "rgb("), ")")
 		parts := strings.Split(inner, ",")
 		if len(parts) == 3 {
@@ -724,7 +689,6 @@ func (a *htmlAdapter) normalizeColor(val string) string {
 		}
 	}
 	if strings.HasPrefix(val, "rgba(") {
-		// rgba(r, g, b, a)
 		inner := strings.TrimSuffix(strings.TrimPrefix(val, "rgba("), ")")
 		parts := strings.Split(inner, ",")
 		if len(parts) == 4 {
@@ -745,11 +709,7 @@ func (a *htmlAdapter) normalizeColor(val string) string {
 	return ""
 }
 
-// mapTailwindColor resolves a Tailwind utility class to a hex color string.
-// It accepts classes like "text-blue-600", "bg-slate-900", "text-white".
-// Returns "" if the color cannot be resolved (unknown custom token, CSS var, etc.).
 func (a *htmlAdapter) mapTailwindColor(class string) string {
-	// Strip the prefix to get the color key (e.g. "text-blue-600" → "blue-600").
 	colorKey := class
 	for _, prefix := range []string{"text-", "bg-", "border-", "ring-", "from-", "to-", "via-"} {
 		if strings.HasPrefix(class, prefix) {
@@ -757,25 +717,14 @@ func (a *htmlAdapter) mapTailwindColor(class string) string {
 			break
 		}
 	}
-
-	// Check CSS variables resolved at runtime — try cssVars first, then skip.
 	if strings.HasPrefix(colorKey, "[") || strings.HasPrefix(colorKey, "var(") {
-		inner := strings.TrimSuffix(strings.TrimPrefix(colorKey, "var("), ")")
-		if hex, ok := a.cssVars[strings.TrimSpace(inner)]; ok {
-			return hex
-		}
-		return ""
+		return a.resolveVar(colorKey)
 	}
-
-	// Check custom color tokens already resolved from project CSS (cssMap).
 	if hex, ok := a.customColors[colorKey]; ok {
 		return hex
 	}
-
-	// Look up the standard Tailwind v3 palette.
 	if hex, ok := tailwindV3Colors[colorKey]; ok {
 		return hex
 	}
-
 	return ""
 }

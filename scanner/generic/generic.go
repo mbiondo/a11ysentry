@@ -76,9 +76,18 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 
 	var trees []scanner.PageTree
 	for _, file := range allFiles {
-		if importedByAnyone[file] {
+		// Heuristic for Generic roots: 
+		// 1. Files not imported.
+		// 2. OR files that look like entry points (App.tsx, index.tsx, etc.)
+		base := strings.ToLower(filepath.Base(file))
+		isEntryPoint := base == "app.tsx" || base == "app.jsx" || base == "app.js" || base == "app.ts" ||
+			base == "index.tsx" || base == "index.jsx" || base == "index.js" || base == "index.ts" ||
+			base == "main.tsx" || base == "main.jsx" || base == "main.js" || base == "main.ts"
+
+		if importedByAnyone[file] && !isEntryPoint {
 			continue
 		}
+		
 		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),

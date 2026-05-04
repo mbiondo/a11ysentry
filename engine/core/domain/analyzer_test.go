@@ -156,6 +156,21 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 			},
 			wantCodes: []string{"REDUNDANT_TITLE", "WCAG_3_1_1", "G141"},
 		},
+		{
+			name: "Inline a11y-ignore",
+			nodes: []USN{
+				{
+					Role:  RoleImage,
+					Label: "",
+					Source: Source{
+						Platform:     PlatformWebReact,
+						IgnoredRules: []string{"WCAG_1_1_1"},
+						RawHTML:      "<img>",
+					},
+				},
+			},
+			wantCodes: []string{"WCAG_3_1_1", "G141"}, // WCAG_1_1_1 should be filtered
+		},
 	}
 
 	cfg := DefaultConfig()
@@ -167,11 +182,27 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 				t.Fatalf("unexpected error: %v", err)
 			}
 			if len(violations) != len(tt.wantCodes) {
-				t.Errorf("expected %d violations, got %d", len(tt.wantCodes), len(violations))
+				gotCodes := []string{}
+				for _, v := range violations {
+					gotCodes = append(gotCodes, v.ErrorCode)
+				}
+				t.Errorf("expected %d violations %v, got %d %v", len(tt.wantCodes), tt.wantCodes, len(violations), gotCodes)
+				return
 			}
-			for i, code := range tt.wantCodes {
-				if i < len(violations) && violations[i].ErrorCode != code {
-					t.Errorf("expected error code %s, got %s", code, violations[i].ErrorCode)
+			
+			gotCodes := make(map[string]int)
+			for _, v := range violations {
+				gotCodes[v.ErrorCode]++
+			}
+			
+			wantCodes := make(map[string]int)
+			for _, code := range tt.wantCodes {
+				wantCodes[code]++
+			}
+			
+			for code, count := range wantCodes {
+				if gotCodes[code] != count {
+					t.Errorf("expected code %s to appear %d times, got %d", code, count, gotCodes[code])
 				}
 			}
 		})

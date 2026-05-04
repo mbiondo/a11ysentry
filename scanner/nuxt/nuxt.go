@@ -75,6 +75,12 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 		pagesDir = filepath.Join(projectRoot, "src", "pages")
 	}
 	
+	globalApp := filepath.Join(projectRoot, "app.vue")
+	if !scanner.FileExists(globalApp) {
+		globalApp = filepath.Join(projectRoot, "src", "app.vue")
+	}
+	hasGlobalApp := scanner.FileExists(globalApp)
+
 	defaultLayout := filepath.Join(projectRoot, "layouts", "default.vue")
 	if !scanner.FileExists(defaultLayout) {
 		defaultLayout = filepath.Join(projectRoot, "src", "layouts", "default.vue")
@@ -90,19 +96,32 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 			continue
 		}
 
-		visited := make(map[string]bool)
 		var root *domain.FileNode
+		var current *domain.FileNode
 
+		// 1. Global app.vue
+		if hasGlobalApp {
+			root = scanner.CollectTree(globalApp, importGraph, make(map[string]bool))
+			current = root
+		}
+
+		// 2. Default layout
 		if hasDefaultLayout {
-			root = scanner.CollectTree(defaultLayout, importGraph, visited)
-			pageNode := scanner.CollectTree(file, importGraph, visited)
-			if pageNode != nil && root != nil {
-				root.Children = append(root.Children, pageNode)
-			} else if pageNode != nil {
-				root = pageNode
+			layoutNode := scanner.CollectTree(defaultLayout, importGraph, make(map[string]bool))
+			if root == nil {
+				root = layoutNode
+			} else if layoutNode != nil {
+				current.Children = append(current.Children, layoutNode)
 			}
-		} else {
-			root = scanner.CollectTree(file, importGraph, visited)
+			current = layoutNode
+		}
+
+		// 3. Page
+		pageNode := scanner.CollectTree(file, importGraph, make(map[string]bool))
+		if root == nil {
+			root = pageNode
+		} else if pageNode != nil {
+			current.Children = append(current.Children, pageNode)
 		}
 
 		label := "pages/" + filepath.ToSlash(rel)

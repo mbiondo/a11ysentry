@@ -40,6 +40,7 @@ var CSSExtensions = map[string]bool{
 var (
 	importRe        = regexp.MustCompile(`(?m)import\s+(?:(?:[\w*\s{},]*)\s+from\s+)?['"]([^'"]+)['"]`)
 	dynamicImportRe = regexp.MustCompile(`import\s*\(['"]([^'"]+)['"]\)`)
+	requireRe       = regexp.MustCompile(`require\s*\(['"]([^'"]+)['"]\)`)
 )
 
 // ResolveImports returns the absolute paths of project-local files imported
@@ -109,19 +110,31 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 	for _, m := range dynamicImportRe.FindAllStringSubmatch(src, -1) {
 		tryResolve(m[1])
 	}
+	for _, m := range requireRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
 
 	return resolved
 }
 
-// CollectTree returns the full transitive closure of root's import graph as a tree.
-func CollectTree(rootPath string, graph map[string][]string, visited map[string]bool) *domain.FileNode {
-	if visited[rootPath] {
-		return nil
+// CollectTree returns the full transitive closure of rootPath's import graph as a tree.
+// It prevents infinite recursion using a path-based cycle detection (visited stack).
+func CollectTree(rootPath string, graph map[string][]string, pathStack map[string]bool) *domain.FileNode {
+	if pathStack[rootPath] {
+		// Cycle detected — return a node marked as cycle to stop recursion.
+		return &domain.FileNode{FilePath: rootPath, IsCycle: true}
 	}
-	visited[rootPath] = true
+
+	// Clone the path stack for this branch to allow convergence without cycles.
+	newStack := make(map[string]bool, len(pathStack)+1)
+	for k, v := range pathStack {
+		newStack[k] = v
+	}
+	newStack[rootPath] = true
+
 	node := &domain.FileNode{FilePath: rootPath}
 	for _, dep := range graph[rootPath] {
-		child := CollectTree(dep, graph, visited)
+		child := CollectTree(dep, graph, newStack)
 		if child != nil {
 			node.Children = append(node.Children, child)
 		}

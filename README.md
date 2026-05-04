@@ -1,103 +1,70 @@
 # 🛡️ A11ySentry
-### Universal Accessibility Engine for Multi-Platform UI
 
-A11ySentry is a deterministic, multi-platform accessibility validator. It provides a single semantic source of truth for all major UI frameworks using the **Universal Semantic Node (USN)** abstraction.
+**A11ySentry** is a professional-grade, multi-platform accessibility auditing engine. It doesn't just look at files; it understands **Component Architectures**.
 
-[![CI/CD Pipeline](https://github.com/mbiondo/a11ysentry/actions/workflows/go.yml/badge.svg)](https://github.com/mbiondo/a11ysentry/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Built for modern frontend engineering, it reconstructs the rendering hierarchy (PageTrees) of your application to provide precise, context-aware accessibility analysis with zero false positives.
 
 ---
 
-## 🚀 The Vision
-Most accessibility tools are platform-locked and rely on brittle heuristics or slow LLMs. A11ySentry introduces a **pure engineering approach**: a high-performance engine that translates any UI (Web, Mobile, Desktop, Gaming) into a common semantic language (USN) and applies a unified set of **deterministic WCAG 2.2 rules**.
+## 🚀 Key Features
 
-## 🛠️ Key Features
-
-### 🌍 Massive Platform Support
-- **Web**: React, Vue, Svelte, Angular, Astro (with automatic layout-chain resolution).
-- **Python**: **Django** and **Flask/Jinja2** (with full template inheritance support).
-- **Mobile**: Android (Compose/XML), iOS (SwiftUI/UIKit), **React Native**, **Flutter**, and **MAUI**.
-- **Desktop**: .NET (MAUI/WPF), **PyQt/PySide** (native .ui parsing), Java (FX/Swing), Electron, Tauri.
-- **Gaming**: Unity, Godot.
-
-### 🧠 The Deterministic Edge
-Unlike LLM-based tools that guess, A11ySentry uses a **pure engineering approach**. It transforms every UI into a **Universal Semantic Node (USN)** tree, allowing for 100% deterministic validation with zero hallucinations.
-
-### 🔍 Intelligent Analysis
-- **Recursive Context Rule (CRITICAL)**: Accessibility states like `aria-hidden`, `disabled`, or platform-specific "exclude from semantics" traits are automatically propagated down the tree. This allows us to catch focus traps and "ghost" interactive elements that other scanners miss.
-- **Structural Link Purpose (WCAG 2.4.4)**: A language-agnostic rule that detects ambiguous links (same label, different destination) by analyzing the entire USN tree for naming collisions.
-- **Tailwind 4 & CSS Support**: Built-in resolution for Tailwind CSS 4 utility classes and external CSS variables. Resolves color contrast statically without a browser.
-
-### ⚡ Developer Experience
-- **Interactive TUI 2.0**: A beautiful terminal dashboard with platform badges, real-time project statistics, and detailed violation summaries.
-- **Universal MCP Support**: One-command integration with AI agents (**Claude, Cursor, VS Code, Gemini, Qwen, OpenCode**) via the Model Context Protocol.
-- **CI/CD Ready**: Built-in `init` command to scaffold GitHub Actions, pre-commit hooks, and configurations.
-- **Zero Hallucinations**: 100% deterministic logic. If A11ySentry flags it, it's a real violation.
+- **Architectural Awareness**: Reconstructs full component trees for Next.js, Nuxt, SvelteKit, Astro, and mobile platforms.
+- **Formal CSS Parsing**: Integrated `tdewolff` parser for perfect color and variable resolution (including CSS Vars & Dark Mode).
+- **W3C ACT Standardized**: Every rule is mapped to official W3C Accessibility Conformance Testing IDs (e.g., `23a2a8`).
+- **A11y-Ignore System**: Suppress specific violations directly in code via `<!-- a11y-ignore: RULE_ID -->`.
+- **Session-Based History**: Every audit is a "Snapshot," allowing you to track progress without mixing stale data.
+- **Universal Semantic Node (USN)**: A unified data model that allows auditing Web, Mobile (Android/iOS/Flutter/RN), and Desktop (DotNet/Electron/PyQt) apps with the same rules.
 
 ---
 
-## 📦 Installation
+## 🛠️ Usage
 
-### Quick Install (Automatic)
-Run the smart installer to download the latest binary and add it to your PATH:
-
-**Windows (PowerShell):**
-```powershell
-irm https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.ps1 | iex
-```
-
-**Unix (Bash):**
+### Installation
 ```bash
-curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
+go build -o a11ysentry ./cmd/a11ysentry
 ```
 
----
-
-## 🖥️ Usage
-
-### CLI Commands
+### Analyze a Project
 ```bash
-# Initialize CI/CD and config
-a11ysentry init
-
-# Analyze a single file
-a11ysentry MyComponent.tsx
-
-# Analyze a full project directory (Framework-aware)
-a11ysentry --dir ./src
-
-# Watch mode for real-time feedback
-a11ysentry --watch .
-
-# Open the TUI Dashboard
-a11ysentry --tui
+./a11ysentry --dir ./my-project
 ```
 
-### AI Agent Integration (MCP)
+### Interactive Dashboard (TUI)
+Explore your component hierarchy and violations in a beautiful terminal interface.
 ```bash
-# Register A11ySentry in all your AI tools at once
-a11ysentry mcp --register
+./a11ysentry --tui
+```
+> **Pro Tip**: Press `t` inside a project to toggle the **Component Explorer**.
+
+### Clear History
+```bash
+./a11ysentry clear
 ```
 
 ---
 
-## 📂 Project Structure
+## 📱 Platform Support
 
-- `engine/`: Core WCAG rules, USN schema, and SQLite history persistence.
-- `adapters/`: Platform-specific parsers (Web, Android, iOS, Flutter, RN, etc.).
-- `scanner/`: Framework detection and dependency graph resolution.
-- `cmd/a11ysentry/`: Main entry point and TUI (Charmbracelet Bubbletea).
-- `mcp/`: Model Context Protocol server and registration logic.
-- `examples/`: Complex multi-platform test cases.
+| Category | Frameworks / Tech |
+| :--- | :--- |
+| **Web** | React, Vue, Svelte, Angular, Astro, Next.js, Nuxt, SvelteKit |
+| **Mobile** | Android (Compose/XML), iOS (SwiftUI), Flutter, React Native |
+| **Desktop** | Electron, .NET (XAML/MAUI), PyQt |
+| **Backend** | Django Templates, Flask (Jinja2) |
 
 ---
 
-## 🤝 Contributing
-We are building the future of inclusive software. Check our **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** to learn how to add new adapters or rules.
+## 🧩 IDE Integration (Alpha)
+A11ySentry can run as a high-performance **Linter Engine** for VS Code, Cursor, and other IDEs.
+```bash
+./a11ysentry --linter
+```
+It accepts file paths on `stdin` and outputs real-time, PageTree-aware JSON diagnostics.
 
-- **[Architecture Deep Dive](./docs/ARCHITECTURE_DEEP_DIVE.md)**
-- **[API Reference](./docs/API_REFERENCE.md)**
-- **[MCP Integration Guide](./docs/MCP_INTEGRATION.md)**
+---
 
-## 📄 License
-Licensed under the [MIT License](./LICENSE).
+## 📜 Compliance
+All rules follow the **WCAG 2.2** guidelines and are verified against **ACT Rules** to ensure professional compliance standards.
+
+---
+**Made with ❤️ for Accessible Engineering.**

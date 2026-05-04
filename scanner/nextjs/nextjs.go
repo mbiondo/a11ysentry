@@ -110,8 +110,12 @@ func (f *Framework) BuildPageTrees(
 	for _, file := range allFiles {
 		base := strings.ToLower(filepath.Base(file))
 		switch base {
-		case "layout.tsx", "layout.jsx":
+		case "layout.tsx", "layout.jsx", "template.tsx", "template.jsx":
 			layoutByDir[filepath.Dir(file)] = file
+		case "loading.tsx", "loading.jsx", "error.tsx", "error.jsx":
+			// These are also part of the hierarchy but handled specifically if needed.
+			// For now we add them to layoutByDir so they get stitched.
+			layoutByDir[filepath.Dir(file)+"/"+base] = file
 		case "page.tsx", "page.jsx":
 			pages = append(pages, file)
 		}
@@ -124,26 +128,32 @@ func (f *Framework) BuildPageTrees(
 	for _, page := range pages {
 		chain := layoutChain(page, layoutByDir, projectRoot)
 
-		visited := make(map[string]bool)
 		var root *domain.FileNode
 		var current *domain.FileNode
 
-		// Stitch layout chain: outermost first.
-		for _, layout := range chain {
-			layoutNode := scanner.CollectTree(layout, importGraph, visited)
-			if layoutNode == nil {
+		// Next.js Rendering Hierarchy:
+		// layout -> template -> error -> loading -> not-found -> page
+		
+		// For simplicity, our chain already contains files in the right order of nesting folders.
+		// Within each folder, we could refine the order (layout before template etc),
+		// but since they are processed as analysis units, the order of nodes in USN 
+		// matters mostly for CSS inheritance.
+		
+		for _, component := range chain {
+			node := scanner.CollectTree(component, importGraph, make(map[string]bool))
+			if node == nil {
 				continue
 			}
 			if root == nil {
-				root = layoutNode
+				root = node
 			} else {
-				current.Children = append(current.Children, layoutNode)
+				current.Children = append(current.Children, node)
 			}
-			current = layoutNode
+			current = node
 		}
 
-		// Add page at the end of the layout chain.
-		pageNode := scanner.CollectTree(page, importGraph, visited)
+		// Add page at the end.
+		pageNode := scanner.CollectTree(page, importGraph, make(map[string]bool))
 		if pageNode != nil {
 			if root == nil {
 				root = pageNode
@@ -170,21 +180,30 @@ func layoutChain(page string, layoutByDir map[string]string, projectRoot string)
 	dir := filepath.Dir(page)
 
 	for {
-		if layout, ok := layoutByDir[dir]; ok {
-			chain = append(chain, layout)
+		// Ordering within the same folder: layout -> template -> error -> loading
+		for _, name := range []string{"layout.tsx", "layout.jsx", "template.tsx", "template.jsx", "error.tsx", "error.jsx", "loading.tsx", "loading.jsx"} {
+			key := dir
+			if strings.Contains(name, "error") || strings.Contains(name, "loading") {
+				key = dir + "/" + name
+			}
+			if l, ok := layoutByDir[key]; ok {
+				if filepath.Base(l) == name {
+					chain = append(chain, l)
+				}
+			}
 		}
-		if dir == projectRoot {
+
+		if dir == projectRoot || dir == filepath.Join(projectRoot, "app") || dir == filepath.Join(projectRoot, "src", "app") {
 			break
 		}
 		parent := filepath.Dir(dir)
 		if parent == dir {
-			// Reached filesystem root — shouldn't happen in practice.
 			break
 		}
 		dir = parent
 	}
 
-	// Reverse: root layout first, nearest layout last.
+	// Reverse so root layouts are first
 	for i, j := 0, len(chain)-1; i < j; i, j = i+1, j-1 {
 		chain[i], chain[j] = chain[j], chain[i]
 	}

@@ -2,7 +2,9 @@ package flask
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"a11ysentry/scanner"
@@ -16,7 +18,8 @@ func (f *Framework) Name() string { return "Flask" }
 
 func (f *Framework) Probe(dir string) bool {
 	return scanner.FileExists(filepath.Join(dir, "app.py")) ||
-		scanner.FileExists(filepath.Join(dir, "wsgi.py"))
+		scanner.FileExists(filepath.Join(dir, "wsgi.py")) ||
+		scanner.DirExists(filepath.Join(dir, "templates"))
 }
 
 func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
@@ -50,8 +53,51 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
+var (
+	jinjaExtendsRe = regexp.MustCompile(`{%\s*extends\s*['"]([^'"]+)['"]\s*%}`)
+	jinjaIncludeRe = regexp.MustCompile(`{%\s*include\s*['"]([^'"]+)['"]\s*%}`)
+)
+
 func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+	src := string(content)
+
+	var resolved []string
+	base := filepath.Dir(filePath)
+
+	tryResolve := func(path string) {
+		// 1. Try relative to current file
+		abs := filepath.Clean(filepath.Join(base, path))
+		if fileSet[abs] {
+			resolved = append(resolved, abs)
+			return
+		}
+
+		// 2. Try relative to template dirs (templates/ or src/templates/)
+		prefixes := []string{
+			filepath.Join(projectRoot, "templates"),
+			filepath.Join(projectRoot, "src", "templates"),
+		}
+		for _, prefix := range prefixes {
+			abs = filepath.Clean(filepath.Join(prefix, path))
+			if fileSet[abs] {
+				resolved = append(resolved, abs)
+				return
+			}
+		}
+	}
+
+	for _, m := range jinjaExtendsRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
+	for _, m := range jinjaIncludeRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
+
+	return resolved
 }
 
 func (f *Framework) BuildPageTrees(

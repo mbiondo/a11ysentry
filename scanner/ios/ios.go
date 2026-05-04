@@ -1,11 +1,11 @@
 package ios
 
 import (
-	"a11ysentry/engine/core/domain"
 	"a11ysentry/scanner"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -57,22 +57,76 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
-// ResolveImports delegates to the shared resolver.
+var (
+	swiftViewRe = regexp.MustCompile(`(\w+)\(\)`)
+)
+
+// ResolveImports implements iOS-specific import resolution.
+// Since Swift doesn't require explicit file imports within the same target,
+// we look for View() instantiation patterns as a heuristic.
 func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+	src := string(content)
+
+	var resolved []string
+	
+	// Fast lookup map
+	baseNames := make(map[string]string)
+	for f := range fileSet {
+		base := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
+		baseNames[base] = f
+	}
+
+	matches := swiftViewRe.FindAllStringSubmatch(src, -1)
+	for _, m := range matches {
+		viewName := m[1]
+		if realPath, ok := baseNames[viewName]; ok {
+			if realPath != filePath {
+				resolved = append(resolved, realPath)
+			}
+		}
+	}
+
+	return resolved
 }
 
-// BuildPageTrees groups all files into a single analysis unit for simplicity.
+// BuildPageTrees identifies Views/Controllers and builds their full import trees.
 func (f *Framework) BuildPageTrees(
 	allFiles []string,
 	importGraph map[string][]string,
 	projectRoot string,
 ) []scanner.PageTree {
+	importedByAnyone := make(map[string]bool)
+	for _, deps := range importGraph {
+		for _, dep := range deps {
+			importedByAnyone[dep] = true
+		}
+	}
+
 	var trees []scanner.PageTree
 	for _, file := range allFiles {
+		// Canonical iOS entry point detection:
+		// 1. Files not imported/referenced.
+		// 2. OR files containing @main or App struct.
+		
+		content, _ := os.ReadFile(file)
+		src := string(content)
+		
+		isUIEntryPoint := strings.Contains(src, "@main") || 
+			strings.Contains(src, ": App") ||
+			strings.HasSuffix(file, "AppDelegate.swift")
+		
+		if importedByAnyone[file] && !isUIEntryPoint {
+			continue
+		}
+		
+		root := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		trees = append(trees, scanner.PageTree{
 			Label: shortPath(file, projectRoot),
-			Root:  &domain.FileNode{FilePath: file},
+			Root:  root,
 		})
 	}
 	return trees

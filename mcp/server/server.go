@@ -40,12 +40,19 @@ import (
 	pyqtfw "a11ysentry/scanner/pyqt"
 	electronfw "a11ysentry/scanner/electron"
 	"os"
+	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
-func Start() {
+type MCPServer struct {
+	repo ports.Repository
+}
+
+func Start(repo ports.Repository) {
+	srv := &MCPServer{repo: repo}
+
 	// Create MCP server
 	s := mcpserver.NewMCPServer(
 		"A11ySentry MCP Server",
@@ -62,7 +69,28 @@ func Start() {
 		),
 	)
 
-	s.AddTool(tool, analyzeHandler)
+	s.AddTool(tool, srv.analyzeHandler)
+
+	// Register the component context tool
+	contextTool := mcp.NewTool("get_component_context",
+		mcp.WithDescription("Get the architectural context of a specific component file. It returns the component's ancestors (layouts/parents) and children, helping you understand how it fits into the rendering hierarchy and avoid redundant props."),
+		mcp.WithString("path",
+			mcp.Required(),
+			mcp.Description("Absolute path to the component file to investigate."),
+		),
+	)
+
+	s.AddTool(contextTool, srv.contextHandler)
+
+	// Register the audit history tool
+	historyTool := mcp.NewTool("get_audit_history",
+		mcp.WithDescription("Retrieve the history of past accessibility audits from the local database."),
+		mcp.WithNumber("limit",
+			mcp.Description("Maximum number of reports to retrieve (default: 10)."),
+		),
+	)
+
+	s.AddTool(historyTool, srv.historyHandler)
 
 	// Start stdio server
 	log.Println("Starting A11ySentry MCP server on stdio...")
@@ -71,7 +99,7 @@ func Start() {
 	}
 }
 
-func analyzeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (srv *MCPServer) analyzeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	pathInput, err := request.RequireString("path")
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("argument 'path' is required: %v", err)), nil
@@ -81,14 +109,14 @@ func analyzeHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Call
 	if len(paths) == 1 {
 		p := strings.TrimSpace(paths[0])
 		if info, err := os.Stat(p); err == nil && info.IsDir() {
-			return analyzeDirectory(ctx, p)
+			return srv.analyzeDirectory(ctx, p)
 		}
 	}
 
-	return analyzeFiles(ctx, paths, pathInput)
+	return srv.analyzeFiles(ctx, paths, pathInput)
 }
 
-func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, error) {
+func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, error) {
 	absDir, err := filepath.Abs(dir)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("Could not resolve directory: %v", err)), nil
@@ -130,7 +158,7 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
 
 		for _, tree := range trees {
-			adapter, _ := getAdapterAndPlatform(tree.Root.FilePath, fw.Name())
+			adapter, platform := getAdapterAndPlatform(tree.Root.FilePath, fw.Name())
 			if adapter == nil {
 				continue
 			}
@@ -147,6 +175,17 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 
 			violations, _ := domain.NewAnalyzer().Analyze(ctx, nodes, cfg)
 			allViolations = append(allViolations, violations...)
+
+			// Persist to repository
+			report := domain.ViolationReport{
+				ProjectName: filepath.Base(root),
+				ProjectRoot: root,
+				FilePath:    tree.Label,
+				Platform:    platform,
+				Timestamp:   time.Now().Unix(),
+				Violations:  violations,
+			}
+			_ = srv.repo.SaveReport(ctx, report)
 		}
 	}
 
@@ -157,7 +196,7 @@ func analyzeDirectory(ctx context.Context, dir string) (*mcp.CallToolResult, err
 	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
 }
 
-func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*mcp.CallToolResult, error) {
+func (srv *MCPServer) analyzeFiles(ctx context.Context, paths []string, originalInput string) (*mcp.CallToolResult, error) {
 	var allViolations []domain.Violation
 	analyzer := domain.NewAnalyzer()
 
@@ -197,7 +236,7 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 		
 		// If the framework supports building trees, we try to "expand" this file's context
 		// Note: This is a simplified version of project-aware analysis but focused on a single entry point.
-		adapter, _ := getAdapterAndPlatform(absPath, fw.Name())
+		adapter, platform := getAdapterAndPlatform(absPath, fw.Name())
 		if adapter == nil {
 			log.Printf("Skipping unsupported file: %s", absPath)
 			continue
@@ -208,8 +247,6 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 			for _, dep := range deps {
 				childNode := &domain.FileNode{FilePath: dep}
 				rootNode.Children = append(rootNode.Children, childNode)
-				// Note: For deep trees, we could recursively expand here, but BuildImportGraph 
-				// is usually called on a full set. Since we only passed [absPath], we get direct children.
 			}
 		}
 
@@ -225,6 +262,17 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 
 		violations, _ := analyzer.Analyze(ctx, nodes, cfg)
 		allViolations = append(allViolations, violations...)
+
+		// Persist to repository
+		report := domain.ViolationReport{
+			ProjectName: filepath.Base(dir),
+			ProjectRoot: dir,
+			FilePath:    absPath,
+			Platform:    platform,
+			Timestamp:   time.Now().Unix(),
+			Violations:  violations,
+		}
+		_ = srv.repo.SaveReport(ctx, report)
 	}
 
 	if len(allViolations) == 0 {
@@ -232,6 +280,120 @@ func analyzeFiles(ctx context.Context, paths []string, originalInput string) (*m
 	}
 
 	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
+}
+
+func (srv *MCPServer) contextHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	pathInput, err := request.RequireString("path")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("argument 'path' is required: %v", err)), nil
+	}
+
+	absPath, err := filepath.Abs(pathInput)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Could not resolve absolute path: %v", err)), nil
+	}
+
+	// 1. Find project root
+	root := scanner.FindProjectRoot(absPath)
+	if root == "" {
+		root = filepath.Dir(absPath)
+	}
+
+	// 2. Detect framework
+	fw := scanner.Detect(root,
+		nextjs.New(), astrofw.New(), nuxt.New(), sveltekit.New(),
+		django.New(), flask.New(), angular.New(), vue.New(),
+		dotnetfw.New(), pyqtfw.New(), electronfw.New(), androidfw.New(),
+		iosfw.New(), generic.New(),
+	)
+
+	// 3. Scan and build trees
+	uiFiles, _, err := fw.CollectFiles(root)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error collecting files: %v", err)), nil
+	}
+
+	importGraph := scanner.BuildImportGraph(uiFiles, fw, root)
+	trees := fw.BuildPageTrees(uiFiles, importGraph, root)
+
+	// 4. Find trees containing the target path
+	var relatedNodes []*domain.FileNode
+	for _, tree := range trees {
+		found := findNodeInTree(tree.Root, absPath)
+		if found != nil {
+			relatedNodes = append(relatedNodes, found)
+		}
+	}
+
+	if len(relatedNodes) == 0 {
+		// If not in a tree, try standalone context
+		standalone := &domain.FileNode{FilePath: absPath}
+		if deps, ok := importGraph[absPath]; ok {
+			for _, dep := range deps {
+				standalone.Children = append(standalone.Children, &domain.FileNode{FilePath: dep})
+			}
+		}
+		return mcp.NewToolResultText(domain.HierarchyToTOON(standalone, absPath)), nil
+	}
+
+	// Merge all related trees into a virtual root for TOON output
+	virtualRoot := &domain.FileNode{
+		FilePath: "Context for " + filepath.Base(absPath),
+		Children: relatedNodes,
+	}
+
+	return mcp.NewToolResultText(domain.HierarchyToTOON(virtualRoot, absPath)), nil
+}
+
+func (srv *MCPServer) historyHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	limit := request.GetInt("limit", 10)
+
+	history, err := srv.repo.GetHistory(ctx, limit)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error retrieving history: %v", err)), nil
+	}
+
+	if len(history) == 0 {
+		return mcp.NewToolResultText("No audit history found."), nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Audit History (last %d reports):\n\n", len(history)))
+	for _, report := range history {
+		t := time.Unix(report.Timestamp, 0).Format("2006-01-02 15:04:05")
+		status := "✅ PASS"
+		if len(report.Violations) > 0 {
+			status = fmt.Sprintf("❌ %d violations", len(report.Violations))
+		}
+		fmt.Fprintf(&sb, "[%s] %s (%s) - %s\n", t, report.FilePath, report.Platform, status)
+	}
+
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func findNodeInTree(root *domain.FileNode, target string) *domain.FileNode {
+	if root == nil {
+		return nil
+	}
+	if root.FilePath == target {
+		// Return a copy to avoid mutating the original tree
+		return &domain.FileNode{
+			FilePath: root.FilePath,
+			Children: root.Children,
+			IsCycle:  root.IsCycle,
+		}
+	}
+	for _, child := range root.Children {
+		found := findNodeInTree(child, target)
+		if found != nil {
+			// We return a copy that preserves the structural context but focuses on the target
+			return &domain.FileNode{
+				FilePath: root.FilePath,
+				Children: []*domain.FileNode{found},
+			}
+		}
+	}
+	return nil
 }
 
 func getAdapterAndPlatform(filePath, fwName string) (ports.Adapter, domain.Platform) {
@@ -295,4 +457,3 @@ func getAdapterAndPlatform(filePath, fwName string) (ports.Adapter, domain.Platf
 
 	return nil, ""
 }
-

@@ -80,3 +80,40 @@ func ToTOON(violations []Violation) string {
 
 	return strings.Join(rows, "\n")
 }
+
+// HierarchyToTOON converts a list of related file nodes into a Token-Oriented Object Notation string.
+// Format: hierarchy[count]{file,rel,depth,isCycle}:
+func HierarchyToTOON(root *FileNode, targetPath string) string {
+	if root == nil {
+		return "hierarchy[0]{file,rel,depth,isCycle}:"
+	}
+
+	var items []string
+	flattenHierarchy(root, 0, "", &items)
+
+	header := fmt.Sprintf("hierarchy[%d]{file,rel,depth,isCycle}:", len(items))
+	return header + "\n" + strings.Join(items, "\n")
+}
+
+func flattenHierarchy(n *FileNode, depth int, rel string, res *[]string) {
+	if n == nil {
+		return
+	}
+
+	isCycle := "0"
+	if n.IsCycle {
+		isCycle = "1"
+	}
+
+	row := fmt.Sprintf("  %s,%s,%d,%s",
+		n.FilePath,
+		rel,
+		depth,
+		isCycle,
+	)
+	*res = append(*res, row)
+
+	for _, child := range n.Children {
+		flattenHierarchy(child, depth+1, "child", res)
+	}
+}

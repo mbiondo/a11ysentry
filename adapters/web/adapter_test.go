@@ -24,7 +24,7 @@ func TestHTMLAdapter_CSSAnalysis(t *testing.T) {
 		</html>
 	`
 	tmpFile, _ := os.CreateTemp("", "test_css_*.html")
-	defer os.Remove(tmpFile.Name()) //nolint:errcheck
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
 	if _, err := tmpFile.WriteString(htmlContent); err != nil {
 		t.Fatal(err)
 	}
@@ -64,5 +64,57 @@ func TestHTMLAdapter_CSSAnalysis(t *testing.T) {
 	// Inline style should override class style
 	if pNode.Traits["color"] != "#123456" {
 		t.Errorf("expected p color #123456 (inline override), got %v", pNode.Traits["color"])
+	}
+}
+
+func TestHTMLAdapter_ComplexCSS(t *testing.T) {
+	htmlContent := `
+		<!DOCTYPE html>
+		<html>
+		<head>
+			<style>
+				:root { --main-bg: #ffffff; --main-fg: #000000; }
+				.btn, .link { color: var(--main-fg); background-color: var(--main-bg); }
+				@media (prefers-color-scheme: dark) {
+					:root { --main-bg: #000000; --main-fg: #ffffff; }
+					.btn { border-color: #ff00ff; }
+				}
+			</style>
+		</head>
+		<body>
+			<button class="btn" id="btn1">Button</button>
+			<a class="link" id="link1">Link</a>
+		</body>
+		</html>
+	`
+	tmpFile, _ := os.CreateTemp("", "test_complex_css_*.html")
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	_ = os.WriteFile(tmpFile.Name(), []byte(htmlContent), 0644)
+
+	adapter := NewHTMLAdapter().(*htmlAdapter)
+	nodes, err := adapter.Ingest(context.Background(), &domain.FileNode{FilePath: tmpFile.Name()})
+	if err != nil {
+		t.Fatalf("Ingest failed: %v", err)
+	}
+
+	var btnNode *domain.USN
+	for i := range nodes {
+		if nodes[i].UID == "btn1" {
+			btnNode = &nodes[i]
+		}
+	}
+
+	if btnNode == nil {
+		t.Fatal("button node not found")
+	}
+
+	// Basic color resolution via variables
+	if btnNode.Traits["color"] != "#000000" {
+		t.Errorf("expected btn color #000000, got %v", btnNode.Traits["color"])
+	}
+
+	// Dark mode override check
+	if adapter.darkCSSMap["btn"]["border-color"] != "#ff00ff" {
+		t.Errorf("expected dark mode border-color #ff00ff, got %v", adapter.darkCSSMap["btn"]["border-color"])
 	}
 }

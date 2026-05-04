@@ -72,11 +72,16 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]string, projectRoot string) []scanner.PageTree {
 	routesDir := filepath.Join(projectRoot, "src", "routes")
 
-	// Index all +layout.svelte files by their directory for fast lookup.
-	layoutByDir := make(map[string]string)
+	// Index all special files by their directory for fast lookup.
+	specialFilesByDir := make(map[string]map[string]string)
 	for _, file := range allFiles {
-		if strings.EqualFold(filepath.Base(file), "+layout.svelte") {
-			layoutByDir[filepath.Dir(file)] = file
+		base := strings.ToLower(filepath.Base(file))
+		if base == "+layout.svelte" || base == "+error.svelte" {
+			dir := filepath.Dir(file)
+			if _, ok := specialFilesByDir[dir]; !ok {
+				specialFilesByDir[dir] = make(map[string]string)
+			}
+			specialFilesByDir[dir][base] = file
 		}
 	}
 
@@ -91,28 +96,27 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 			continue
 		}
 
-		visited := make(map[string]bool)
 		var root *domain.FileNode
 		var current *domain.FileNode
 
-		chain := layoutChain(filepath.Dir(file), routesDir, layoutByDir)
+		chain := svelteLayoutChain(filepath.Dir(file), routesDir, specialFilesByDir)
 
 		// Stitch layout chain: outermost first.
-		for _, layout := range chain {
-			layoutNode := scanner.CollectTree(layout, importGraph, visited)
-			if layoutNode == nil {
+		for _, component := range chain {
+			node := scanner.CollectTree(component, importGraph, make(map[string]bool))
+			if node == nil {
 				continue
 			}
 			if root == nil {
-				root = layoutNode
+				root = node
 			} else {
-				current.Children = append(current.Children, layoutNode)
+				current.Children = append(current.Children, node)
 			}
-			current = layoutNode
+			current = node
 		}
 
 		// Add page at the end of the layout chain.
-		pageNode := scanner.CollectTree(file, importGraph, visited)
+		pageNode := scanner.CollectTree(file, importGraph, make(map[string]bool))
 		if pageNode != nil {
 			if root == nil {
 				root = pageNode
@@ -130,14 +134,20 @@ func (f *Framework) BuildPageTrees(allFiles []string, importGraph map[string][]s
 	return trees
 }
 
-// layoutChain walks up from pageDir to routesDir collecting +layout.svelte at
+// svelteLayoutChain walks up from pageDir to routesDir collecting +layout.svelte and +error.svelte at
 // each level, then reverses the slice so the root layout comes first.
-func layoutChain(pageDir, routesDir string, layoutByDir map[string]string) []string {
+func svelteLayoutChain(pageDir, routesDir string, specialFilesByDir map[string]map[string]string) []string {
 	var chain []string
 	cur := pageDir
 	for {
-		if l, ok := layoutByDir[cur]; ok {
-			chain = append(chain, l)
+		if files, ok := specialFilesByDir[cur]; ok {
+			// Order within folder: layout then error
+			if l, ok := files["+layout.svelte"]; ok {
+				chain = append(chain, l)
+			}
+			if e, ok := files["+error.svelte"]; ok {
+				chain = append(chain, e)
+			}
 		}
 		if cur == routesDir {
 			break

@@ -167,55 +167,39 @@ type Repository interface {
 
 The MCP server exposes the following tools to AI agents:
 
-#### `analyze_file`
+#### `analyze_accessibility`
 
-Analyzes a file for accessibility violations.
+Audits source files or full project directories for accessibility violations.
 
 **Parameters:**
 ```json
 {
-  "file_path": "string (required)",
-  "platform": "string (optional, auto-detected)"
+  "path": "string (required) - Absolute or relative path to the source file(s) or directory to analyze. Supports comma-separated paths for multi-file context."
 }
 ```
 
 **Response:**
+Returns a list of violations in **TOON** format for token efficiency.
+
+#### `get_component_context`
+
+Returns the architectural hierarchy (parents and children) of a component to provide better context for analysis.
+
+**Parameters:**
 ```json
 {
-  "violations": [
-    {
-      "error_code": "WCAG_1_1_1",
-      "message": "Image missing alternative text.",
-      "line": 42,
-      "column": 10,
-      "fix_snippet": "Add alt=\"Description\" to the image tag."
-    }
-  ],
-  "total": 1
+  "path": "string (required) - Absolute path to the component file to investigate."
 }
 ```
 
 #### `get_audit_history`
 
-Retrieves past audit reports from the SQLite database.
+Retrieves the history of past accessibility audits from the local database.
 
 **Parameters:**
 ```json
 {
-  "limit": "number (default: 10)"
-}
-```
-
-#### `check_wcag_compliance`
-
-Checks if a code snippet meets specific WCAG criteria.
-
-**Parameters:**
-```json
-{
-  "code": "string (required)",
-  "wcag_level": "string (A, AA, AAA)",
-  "platform": "string"
+  "limit": "number (default: 10) - Maximum number of reports to retrieve."
 }
 ```
 

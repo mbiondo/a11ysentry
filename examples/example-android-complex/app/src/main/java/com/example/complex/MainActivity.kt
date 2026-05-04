@@ -8,12 +8,14 @@ import androidx.compose.material.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.complex.components.CustomHeader
+import com.example.complex.components.SharedIcon
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             Column(modifier = Modifier.padding(16.dp)) {
+                SharedIcon()
                 // Testing cross-file import resolution
                 CustomHeader(title = "Complex Example")
 

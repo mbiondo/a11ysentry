@@ -147,6 +147,42 @@ func FindProjectRoots(dir string, excludes ...string) []string {
 	return roots
 }
 
+// FindProjectRoot searches upwards from path to find the nearest directory 
+// that contains project markers. Returns the absolute path of the root, 
+// or an empty string if none is found.
+func FindProjectRoot(path string) string {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		abs = path
+	}
+
+	info, err := os.Stat(abs)
+	if err != nil {
+		return ""
+	}
+
+	var curr string
+	if info.IsDir() {
+		curr = abs
+	} else {
+		curr = filepath.Dir(abs)
+	}
+
+	for {
+		if isProjectRoot(curr) {
+			return curr
+		}
+
+		parent := filepath.Dir(curr)
+		if parent == curr {
+			break // Reached filesystem root
+		}
+		curr = parent
+	}
+
+	return ""
+}
+
 // collectRoots is the recursive implementation of FindProjectRoots.
 func collectRoots(dir string, excludeMap map[string]bool) []string {
 	entries, err := os.ReadDir(dir)

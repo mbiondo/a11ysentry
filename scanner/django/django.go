@@ -2,7 +2,9 @@ package django
 
 import (
 	"io/fs"
+	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"a11ysentry/scanner"
@@ -50,8 +52,51 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
+var (
+	djangoExtendsRe = regexp.MustCompile(`{%\s*extends\s*['"]([^'"]+)['"]\s*%}`)
+	djangoIncludeRe = regexp.MustCompile(`{%\s*include\s*['"]([^'"]+)['"]\s*%}`)
+)
+
 func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil
+	}
+	src := string(content)
+
+	var resolved []string
+	base := filepath.Dir(filePath)
+
+	tryResolve := func(path string) {
+		// 1. Try relative to current file
+		abs := filepath.Clean(filepath.Join(base, path))
+		if fileSet[abs] {
+			resolved = append(resolved, abs)
+			return
+		}
+
+		// 2. Try relative to template dirs (templates/ or src/templates/)
+		prefixes := []string{
+			filepath.Join(projectRoot, "templates"),
+			filepath.Join(projectRoot, "src", "templates"),
+		}
+		for _, prefix := range prefixes {
+			abs = filepath.Clean(filepath.Join(prefix, path))
+			if fileSet[abs] {
+				resolved = append(resolved, abs)
+				return
+			}
+		}
+	}
+
+	for _, m := range djangoExtendsRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
+	for _, m := range djangoIncludeRe.FindAllStringSubmatch(src, -1) {
+		tryResolve(m[1])
+	}
+
+	return resolved
 }
 
 func (f *Framework) BuildPageTrees(
