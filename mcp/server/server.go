@@ -358,7 +358,7 @@ func (srv *MCPServer) historyHandler(ctx context.Context, request mcp.CallToolRe
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("Audit History (last %d reports):\n\n", len(history)))
+	fmt.Fprintf(&sb, "Audit History (last %d reports):\n\n", len(history))
 	for _, report := range history {
 		t := time.Unix(report.Timestamp, 0).Format("2006-01-02 15:04:05")
 		status := "✅ PASS"
