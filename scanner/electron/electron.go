@@ -60,8 +60,8 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
+	return scanner.ResolveImports(filePath, projectRoot, fileSet, aliases)
 }
 
 func (f *Framework) BuildPageTrees(

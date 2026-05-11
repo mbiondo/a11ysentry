@@ -58,13 +58,12 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 }
 
 var (
-	swiftViewRe = regexp.MustCompile(`(\w+)\(\)`)
+	swiftViewRe = regexp.MustCompile(`([A-Z]\w+)\(`)
+	swiftDefRe  = regexp.MustCompile(`(?m)^(?:struct|class)\s+([A-Z]\w+)`)
 )
 
 // ResolveImports implements iOS-specific import resolution.
-// Since Swift doesn't require explicit file imports within the same target,
-// we look for View() instantiation patterns as a heuristic.
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil
@@ -73,17 +72,25 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 
 	var resolved []string
 	
-	// Fast lookup map
-	baseNames := make(map[string]string)
+	// Index all UI definitions in the project once if needed
+	// (For simplicity in this surgical edit, we build it every time, but a production 
+	// version would cache it in the Framework struct)
+	symbolMap := make(map[string]string)
 	for f := range fileSet {
+		c, _ := os.ReadFile(f)
+		defs := swiftDefRe.FindAllStringSubmatch(string(c), -1)
+		for _, d := range defs {
+			symbolMap[d[1]] = f
+		}
+		// Also keep filename as fallback
 		base := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
-		baseNames[base] = f
+		symbolMap[base] = f
 	}
 
 	matches := swiftViewRe.FindAllStringSubmatch(src, -1)
 	for _, m := range matches {
 		viewName := m[1]
-		if realPath, ok := baseNames[viewName]; ok {
+		if realPath, ok := symbolMap[viewName]; ok {
 			if realPath != filePath {
 				resolved = append(resolved, realPath)
 			}

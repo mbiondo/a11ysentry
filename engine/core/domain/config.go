@@ -19,6 +19,7 @@ type ProjectConfig struct {
 	Format        string                `json:"format"`
 	ExitOnWarning bool                  `json:"exitOnWarning"`
 	Platform      string                `json:"platform"`
+	ShowTree      bool                  `json:"showTree"`
 	Rules         map[string]RuleConfig `json:"rules"`
 }
 

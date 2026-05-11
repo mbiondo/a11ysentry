@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"a11ysentry/engine/core/domain"
 )
@@ -116,5 +117,60 @@ func TestHTMLAdapter_ComplexCSS(t *testing.T) {
 	// Dark mode override check
 	if adapter.darkCSSMap["btn"]["border-color"] != "#ff00ff" {
 		t.Errorf("expected dark mode border-color #ff00ff, got %v", adapter.darkCSSMap["btn"]["border-color"])
+	}
+}
+
+func TestHTMLAdapter_OpaqueNode(t *testing.T) {
+	// GIVEN a file using an external component
+	htmlContent := `<MuiButton aria-label="Submit" disabled />`
+	tmpFile, _ := os.CreateTemp("", "test_opaque_*.tsx")
+	defer func() { _ = os.Remove(tmpFile.Name()) }()
+	err := os.WriteFile(tmpFile.Name(), []byte(htmlContent), 0644)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// AND a FileNode tree where MuiButton is marked as opaque
+	root := &domain.FileNode{
+		FilePath: tmpFile.Name(),
+		Children: []*domain.FileNode{
+			{
+				FilePath:     "pkg://@mui/material/MuiButton",
+				IsOpaque:     true,
+				OpaqueSource: "@mui/material/MuiButton",
+			},
+		},
+	}
+
+	adapter := NewHTMLAdapter()
+	
+	// WHEN ingesting the tree
+	nodes, err := adapter.Ingest(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// THEN we MUST find a USN for the opaque component with its traits
+	var opaqueNode *domain.USN
+	for i := range nodes {
+		if strings.EqualFold(nodes[i].UID, "MuiButton") {
+			opaqueNode = &nodes[i]
+		}
+	}
+
+	if opaqueNode == nil {
+		t.Fatal("opaque node MuiButton not found")
+	}
+
+	if opaqueNode.Label != "Submit" {
+		t.Errorf("expected label 'Submit', got %s", opaqueNode.Label)
+	}
+
+	if !opaqueNode.IsOpaque {
+		t.Error("expected node to be marked as IsOpaque")
+	}
+
+	if opaqueNode.Source.OpaqueSource != "@mui/material/MuiButton" {
+		t.Errorf("expected OpaqueSource '@mui/material/MuiButton', got %s", opaqueNode.Source.OpaqueSource)
 	}
 }

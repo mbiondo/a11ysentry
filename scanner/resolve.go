@@ -38,14 +38,34 @@ var CSSExtensions = map[string]bool{
 }
 
 var (
-	importRe        = regexp.MustCompile(`(?m)import\s+(?:(?:[\w*\s{},]*)\s+from\s+)?['"]([^'"]+)['"]`)
+	importRe        = regexp.MustCompile(`(?m)import\s+(?:([\w*\s{},]*)\s+from\s+)?['"]([^'"]+)['"]`)
 	dynamicImportRe = regexp.MustCompile(`import\s*\(['"]([^'"]+)['"]\)`)
 	requireRe       = regexp.MustCompile(`require\s*\(['"]([^'"]+)['"]\)`)
 )
 
+func getUsedUIComponents(identifiers string, src string) []string {
+	var used []string
+	// Clean identifiers: remove symbols and keywords
+	clean := strings.NewReplacer("{", " ", "}", " ", "*", " ", ",", " ", "as", " ").Replace(identifiers)
+	parts := strings.Fields(clean)
+	for _, p := range parts {
+		if len(p) > 0 && p[0] >= 'A' && p[0] <= 'Z' {
+			// Intelligent check: is this identifier actually used as a UI component tag?
+			// React/Astro/Svelte/Vue/Solid use `<Component` or `</Component>`.
+			tagOpen := "<" + p
+			tagClose := "</" + p + ">"
+			if strings.Contains(src, tagOpen) || strings.Contains(src, tagClose) {
+				used = append(used, p)
+			}
+		}
+	}
+	return used
+}
+
 // ResolveImports returns the absolute paths of project-local files imported
-// by filePath. External packages (node_modules) are ignored.
-func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool) []string {
+// by filePath. External packages (node_modules) are marked as pkg:// if they
+// likely contain UI components.
+func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool, aliases *TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil
@@ -69,9 +89,8 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 
 	// Default: Generic resolution (Regex-based)
 	base := filepath.Dir(filePath)
-	aliases := LoadTSConfigPaths(projectRoot)
 
-	tryResolve := func(importPath string) {
+	tryResolve := func(importPath string, identifiers string) {
 		var abs string
 		if strings.HasPrefix(importPath, "/") {
 			// Web convention: / is project root. 
@@ -84,6 +103,15 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 			if p := resolveAlias(importPath, aliases, projectRoot, fileSet); p != "" {
 				// resolveAlias should return the correctly cased path from fileSet
 				resolved = append(resolved, p)
+			} else {
+				// If it's not a local path or alias, but looks like a package (e.g. @org/pkg or pkg)
+				// we mark it as an opaque package reference ONLY if it looks like it provides components.
+				if (!strings.Contains(importPath, "/") || strings.HasPrefix(importPath, "@")) {
+					usedComponents := getUsedUIComponents(identifiers, src)
+					for _, comp := range usedComponents {
+						resolved = append(resolved, "pkg://"+importPath+"/"+comp)
+					}
+				}
 			}
 			return
 		}
@@ -105,13 +133,13 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 	}
 
 	for _, m := range importRe.FindAllStringSubmatch(src, -1) {
-		tryResolve(m[1])
+		tryResolve(m[2], m[1])
 	}
 	for _, m := range dynamicImportRe.FindAllStringSubmatch(src, -1) {
-		tryResolve(m[1])
+		tryResolve(m[1], "")
 	}
 	for _, m := range requireRe.FindAllStringSubmatch(src, -1) {
-		tryResolve(m[1])
+		tryResolve(m[1], "")
 	}
 
 	return resolved
@@ -120,6 +148,14 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 // CollectTree returns the full transitive closure of rootPath's import graph as a tree.
 // It prevents infinite recursion using a path-based cycle detection (visited stack).
 func CollectTree(rootPath string, graph map[string][]string, pathStack map[string]bool) *domain.FileNode {
+	if strings.HasPrefix(rootPath, "pkg://") {
+		return &domain.FileNode{
+			FilePath:     rootPath,
+			IsOpaque:     true,
+			OpaqueSource: strings.TrimPrefix(rootPath, "pkg://"),
+		}
+	}
+
 	if pathStack[rootPath] {
 		// Cycle detected — return a node marked as cycle to stop recursion.
 		return &domain.FileNode{FilePath: rootPath, IsCycle: true}
@@ -158,11 +194,13 @@ func BuildImportGraph(allFiles []string, fw ProjectFramework, projectRoot string
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
+	aliases := LoadTSConfigPaths(projectRoot)
+
 	for _, f := range allFiles {
 		wg.Add(1)
 		go func(file string) {
 			defer wg.Done()
-			deps := fw.ResolveImports(file, projectRoot, fileSet)
+			deps := fw.ResolveImports(file, projectRoot, fileSet, aliases)
 			mu.Lock()
 			graph[file] = deps
 			mu.Unlock()

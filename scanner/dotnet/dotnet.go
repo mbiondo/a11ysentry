@@ -65,7 +65,7 @@ var (
 	razorImportRe = regexp.MustCompile(`(?m)@using\s+([\w.]+)`)
 )
 
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	ext := strings.ToLower(filepath.Ext(filePath))
 	var resolved []string
 

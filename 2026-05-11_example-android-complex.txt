@@ -1,0 +1,50 @@
+A11ySentry Analysis Report - Mon, 11 May 2026 03:03:37 -03
+============================================================
+
+
+Page: app\src\main\java\com\example\complex\MainActivity.kt
+  MainActivity.kt
+    └─ CustomHeader.kt
+      └─ SharedIcon.kt
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+      └─ SharedIcon.kt
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+    └─ SharedIcon.kt
+      └─ ThemeContext.kt
+        └─ MainActivity.kt (cycle)
+      └─ ThemeContext.kt
+        └─ MainActivity.kt (cycle)
+    └─ SharedIcon.kt
+      └─ ThemeContext.kt
+        └─ MainActivity.kt (cycle)
+      └─ ThemeContext.kt
+        └─ MainActivity.kt (cycle)
+    └─ CustomHeader.kt
+      └─ SharedIcon.kt
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+      └─ SharedIcon.kt
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+        └─ ThemeContext.kt
+          └─ MainActivity.kt (cycle)
+
+  app\src\main\java\com\example\complex\components\CustomHeader.kt:12:4  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]
+  app\src\main\java\com\example\complex\MainActivity.kt:25:16  error    button missing accessible name or label.  [WCAG_4_1_2]
+  app\src\main\java\com\example\complex\MainActivity.kt:48:24  error    button missing accessible name or label.  [WCAG_4_1_2]
+
+Page: app\src\main\java\com\example\complex\ui\LegacyActivity.java
+  LegacyActivity.java
+    └─ activity_legacy.xml
+      └─ partial_header.xml
+
+  app\src\main\java\com\example\complex\ui\LegacyActivity.java:16:12  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]
+  app\src\main\res\layout\partial_header.xml:1:0  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]

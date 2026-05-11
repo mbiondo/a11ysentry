@@ -63,7 +63,7 @@ import (
 )
 
 var (
-	Version    = "0.0.10"
+	Version    = "0.1.0"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 
@@ -107,6 +107,7 @@ func main() {
 	cssFlag := flag.String("css", "", "Comma-separated list of external CSS/SCSS files to pre-load (for color resolution in single-file mode)")
 	outputFlag := flag.String("output", "", "Save results to a specific file (e.g. results.txt). If empty in project mode, defaults to date_project.txt")
 	watchFlag := flag.Bool("watch", false, "Watch input files for changes and re-analyze automatically")
+	showTreeFlag := flag.Bool("show-tree", false, "Print the parsed component tree for each analyzed page")
 	linterFlag := flag.Bool("linter", false, "Run in Linter mode (JSON stream on stdin, project-aware analysis)")
 	flag.Parse()
 
@@ -126,6 +127,9 @@ func main() {
 	}
 	if *excludeFlag != "" {
 		cfg.Exclude = append(cfg.Exclude, strings.Split(*excludeFlag, ",")...)
+	}
+	if *showTreeFlag {
+		cfg.ShowTree = true
 	}
 
 	repo := setupRepository()
@@ -182,7 +186,7 @@ func main() {
 	}
 
 	allReports, hasErrors, hasWarnings := analyzeFiles(args, cfg, extraCSS, repo)
-	printReports(allReports, cfg.Format, projectRoot, *outputFlag)
+	printReports(allReports, cfg.Format, projectRoot, *outputFlag, cfg.ShowTree)
 
 	if cfg.Format == "text" {
 		elapsed := time.Since(startTime)
@@ -250,7 +254,7 @@ func runProjectAnalysis(dir string, cfg domain.ProjectConfig, repo ports.Reposit
 		outputFilePath = fmt.Sprintf("%s_%s.txt", date, projectName)
 	}
 
-	printReports(allReports, cfg.Format, absDir, outputFilePath)
+	printReports(allReports, cfg.Format, absDir, outputFilePath, cfg.ShowTree)
 
 	if cfg.Format == "text" && outputFilePath != "" {
 		elapsed := time.Since(startTime)
@@ -387,13 +391,14 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 			}
 
 			report := domain.ViolationReport{
-				RunID:       runID,
-				ProjectName: filepath.Base(absDir),
-				ProjectRoot: absDir,
-				FilePath:    tree.Label,
-				Platform:    platform,
-				Violations:  violations,
-				Hierarchy:   tree.Root,
+				RunID:         runID,
+				ProjectName:   filepath.Base(absDir),
+				ProjectRoot:   absDir,
+				FilePath:      tree.Label,
+				Platform:      platform,
+				Violations:    violations,
+				Hierarchy:     tree.Root,
+				OpacityMetric: domain.CalculateOpacity(usns),
 			}
 
 			// Persistence.
@@ -492,11 +497,12 @@ func analyzeFiles(paths []string, cfg domain.ProjectConfig, extraCSS []string, r
 			continue
 		}
 		report := domain.ViolationReport{
-			ProjectName: pName,
-			ProjectRoot: pRoot,
-			FilePath:    absPath,
-			Platform:    platform,
-			Violations:  violations,
+			ProjectName:   pName,
+			ProjectRoot:   pRoot,
+			FilePath:      absPath,
+			Platform:      platform,
+			Violations:    violations,
+			OpacityMetric: domain.CalculateOpacity(usns),
 		}
 
 		_ = repo.SaveReport(context.Background(), report)
@@ -529,7 +535,7 @@ func reportHasWarnings(r domain.ViolationReport) bool {
 	return false
 }
 
-func printReports(reports []domain.ViolationReport, format, projectRoot, outputFilePath string) {
+func printReports(reports []domain.ViolationReport, format, projectRoot, outputFilePath string, showTree bool) {
 	var out []byte
 	var err error
 
@@ -562,9 +568,17 @@ func printReports(reports []domain.ViolationReport, format, projectRoot, outputF
 	// Text mode logic
 	var b strings.Builder
 	for _, r := range reports {
-		if len(r.Violations) > 0 {
+		if len(r.Violations) > 0 || showTree {
 			fmt.Fprintf(&b, "\nPage: %s\n", shortPath(r.FilePath, projectRoot))
-			b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
+			if showTree && r.Hierarchy != nil {
+				b.WriteString(printTree(r.Hierarchy, 1))
+				b.WriteString("\n")
+			}
+			if len(r.Violations) > 0 {
+				b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
+			} else {
+				b.WriteString("  No violations found.\n")
+			}
 		}
 	}
 
@@ -578,6 +592,31 @@ func printReports(reports []domain.ViolationReport, format, projectRoot, outputF
 	} else {
 		fmt.Print(b.String())
 	}
+}
+
+func printTree(node *domain.FileNode, level int) string {
+	if node == nil {
+		return ""
+	}
+	indent := strings.Repeat("  ", level)
+	var prefix string
+	if level > 1 {
+		prefix = "└─ "
+	}
+	
+	// Format the node label
+	name := filepath.Base(node.FilePath)
+	if node.IsOpaque {
+		name = fmt.Sprintf("[%s] (opaque)", node.OpaqueSource)
+	} else if node.IsCycle {
+		name = fmt.Sprintf("%s (cycle)", name)
+	}
+	
+	res := fmt.Sprintf("%s%s%s\n", indent, prefix, name)
+	for _, c := range node.Children {
+		res += printTree(c, level+1)
+	}
+	return res
 }
 
 func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo ports.Repository, projectRoot string) {
@@ -595,7 +634,7 @@ func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo 
 
 	// Initial run.
 	reports, _, _ := analyzeFiles(paths, cfg, extraCSS, repo)
-	printReports(reports, cfg.Format, projectRoot, "")
+	printReports(reports, cfg.Format, projectRoot, "", cfg.ShowTree)
 
 	for {
 		select {
@@ -606,7 +645,7 @@ func runWatch(paths []string, cfg domain.ProjectConfig, extraCSS []string, repo 
 			if event.Op&fsnotify.Write == fsnotify.Write {
 				fmt.Printf("\n[%s] File changed: %s\n", time.Now().Format("15:04:05"), event.Name)
 				reports, _, _ := analyzeFiles([]string{event.Name}, cfg, extraCSS, repo)
-				printReports(reports, cfg.Format, projectRoot, "")
+				printReports(reports, cfg.Format, projectRoot, "", cfg.ShowTree)
 			}
 		case err, ok := <-watcher.Errors:
 			if !ok {

@@ -55,14 +55,15 @@ const (
 // USN (Universal Semantic Node) captures the essential semantic properties
 // of a UI element in a platform-agnostic way.
 type USN struct {
-	UID       string
-	Role      SemanticRole
-	Label     string
-	State     USNState
-	Traits    map[string]any
-	Geometry  Geometry
-	Hierarchy Hierarchy
-	Source    Source
+	UID          string
+	Role         SemanticRole
+	Label        string
+	IsOpaque     bool // true if internal source is not available
+	State        USNState
+	Traits       map[string]any
+	Geometry     Geometry
+	Hierarchy    Hierarchy
+	Source       Source
 }
 
 // USNState represents the interactive state of a UI element.
@@ -93,5 +94,7 @@ type Source struct {
 	Column       int
 	RawHTML      string
 	IsComponent  bool     // true when the file is a partial component, not a full HTML document
+	IsOpaque     bool     // true if internal source is not available
+	OpaqueSource string   // Identifier of the external source (e.g. "@mui/material")
 	IgnoredRules []string // list of error codes to ignore for this specific element
 }

@@ -67,7 +67,7 @@ const submit = () => {}
 			}
 		}
 		if n.Role == domain.RoleButton {
-			if val, ok := n.Traits["@click"]; ok && val == "submit()" {
+			if val, ok := n.Traits["onclick"]; ok && val == "submit()" {
 				foundClick = true
 			}
 		}
@@ -83,7 +83,7 @@ const submit = () => {}
 		t.Errorf("Expected v-bind:alt to be parsed as dynamicAlt2")
 	}
 	if !foundClick {
-		t.Errorf("Expected @click to be preserved in traits")
+		t.Errorf("Expected @click to be parsed as onclick")
 	}
 	if !foundStyle {
 		// Currently, dynamic styles might not be fully resolvable via class bindings in the simple parser

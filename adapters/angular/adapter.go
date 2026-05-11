@@ -2,6 +2,7 @@ package angular
 
 import (
 	"context"
+	"strings"
 
 	"a11ysentry/adapters/web"
 	"a11ysentry/engine/core/domain"
@@ -12,32 +13,34 @@ type angularAdapter struct {
 	webAdapter ports.Adapter
 }
 
+func angularMapper(key, val string) (string, string) {
+	// Map event bindings: (click) -> onclick
+	if strings.HasPrefix(key, "(") && strings.HasSuffix(key, ")") {
+		eventName := key[1 : len(key)-1]
+		return "on" + eventName, val
+	}
+	
+	// Map attribute bindings: [attr.aria-label] -> aria-label
+	if strings.HasPrefix(key, "[attr.") && strings.HasSuffix(key, "]") {
+		attrName := key[6 : len(key)-1]
+		return attrName, "{{" + val + "}}"
+	}
+	
+	// Map property bindings: [alt] -> alt
+	if strings.HasPrefix(key, "[") && strings.HasSuffix(key, "]") {
+		attrName := key[1 : len(key)-1]
+		return attrName, "{{" + val + "}}"
+	}
+	
+	return key, val
+}
+
 func NewAngularAdapter() ports.Adapter {
 	return &angularAdapter{
-		webAdapter: web.NewHTMLAdapter(),
+		webAdapter: web.NewHTMLAdapterWithMapper(domain.Platform("angular"), angularMapper),
 	}
 }
 
 func (a *angularAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
-	// The webAdapter already has specific support for [alt] and [attr.alt] bindings built-in 
-	// (see adapters/web/adapter.go lines 220-224) 
-	// So we can just delegate directly and override the platform name.
-	nodes, err := a.webAdapter.Ingest(ctx, root)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range nodes {
-		nodes[i].Source.Platform = domain.Platform("angular")
-		
-		// Additional fixup for [attr.aria-label] which isn't natively handled in webAdapter yet
-		if val, ok := nodes[i].Traits["[attr.aria-label]"]; ok {
-			strVal, _ := val.(string)
-			if strVal != "" {
-				nodes[i].Label = "{{" + strVal + "}}"
-			}
-		}
-	}
-
-	return nodes, nil
+	return a.webAdapter.Ingest(ctx, root)
 }

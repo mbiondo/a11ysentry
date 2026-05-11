@@ -58,7 +58,7 @@ var (
 	jinjaIncludeRe = regexp.MustCompile(`{%\s*include\s*['"]([^'"]+)['"]\s*%}`)
 )
 
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil

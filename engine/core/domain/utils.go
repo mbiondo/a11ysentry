@@ -38,6 +38,20 @@ func GetLuminance(hex string) float64 {
 	return 0.2126*f(rs) + 0.7152*f(gs) + 0.0722*f(bs)
 }
 
+// CalculateOpacity returns the percentage of opaque nodes in a slice of USNs.
+func CalculateOpacity(nodes []USN) float64 {
+	if len(nodes) == 0 {
+		return 0.0
+	}
+	opaqueCount := 0
+	for _, n := range nodes {
+		if n.IsOpaque {
+			opaqueCount++
+		}
+	}
+	return (float64(opaqueCount) / float64(len(nodes))) * 100.0
+}
+
 func isLandmark(role SemanticRole) bool {
 	switch role {
 	case RoleMain, RoleNav, RoleAside, RoleHeader, RoleFooter, RoleSection, RoleForm, RoleSearch:

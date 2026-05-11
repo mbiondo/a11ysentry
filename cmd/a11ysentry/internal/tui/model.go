@@ -57,38 +57,55 @@ func NewMainModel(repo ports.Repository) MainModel {
 }
 
 type treeItem struct {
-	label   string
-	level   int
-	isRoot  bool
-	isCycle bool
-	report  domain.ViolationReport
+	label        string
+	level        int
+	isRoot       bool
+	isCycle      bool
+	isOpaque     bool
+	opaqueSource string
+	report       domain.ViolationReport
 }
 
 func (i treeItem) Title() string {
 	if i.label == "" {
-		return "────────────────────────────────────────────────"
+		return "  " + strings.Repeat("─", 40)
 	}
 	prefix := ""
 	if i.level > 0 {
 		prefix = strings.Repeat("  ", i.level-1) + "└─ "
 	}
+	
 	name := filepath.Base(i.label)
 	if i.isRoot {
-		name = "🌳 " + name
+		// Entry point: show relative path from project root for context
+		rel, err := filepath.Rel(i.report.ProjectRoot, i.label)
+		if err == nil {
+			name = "📂 " + filepath.ToSlash(rel)
+		} else {
+			name = "📂 " + name
+		}
+	} else {
+		name = "📄 " + name
 	}
+	
 	if i.isCycle {
-		name = "↺ " + name + " (circular)"
+		name = name + " ↺"
+	}
+
+	if i.isOpaque {
+		name = name + " [opaque]"
 	}
 
 	// Apply styles based on violations
 	style := lipgloss.NewStyle()
-	if i.report.ID != 0 {
+	if i.report.ID != 0 || len(i.report.Violations) > 0 {
 		hasError, hasWarning := false, false
 		for _, v := range i.report.Violations {
 			if v.SourceRef.FilePath == i.label {
-				if v.Severity == "error" {
+				switch v.Severity {
+				case "error":
 					hasError = true
-				} else {
+				case "warning":
 					hasWarning = true
 				}
 			}
@@ -98,8 +115,18 @@ func (i treeItem) Title() string {
 		} else if hasWarning {
 			style = style.Foreground(lipgloss.Color("#FFA500")).Bold(true)
 		} else {
-			style = style.Foreground(lipgloss.Color("#A3BE8C"))
+			if i.isOpaque {
+				style = style.Foreground(lipgloss.Color("#767676"))
+			} else {
+				style = style.Foreground(lipgloss.Color("#A3BE8C"))
+			}
 		}
+	} else if i.isOpaque {
+		style = style.Foreground(lipgloss.Color("#767676"))
+	}
+
+	if i.isOpaque {
+		style = style.Faint(true)
 	}
 
 	return prefix + style.Render(name)
@@ -110,6 +137,9 @@ func (i treeItem) Description() string {
 		return ""
 	}
 	stats := ""
+	if i.isOpaque {
+		stats = " • Source: " + i.opaqueSource
+	}
 	if i.report.ID != 0 {
 		errors, warnings := 0, 0
 		for _, v := range i.report.Violations {
@@ -318,15 +348,19 @@ func (m MainModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *MainModel) updateTreeList() {
 	var items []list.Item
 
+	first := true
 	for _, r := range m.allReports {
 		if r.ProjectName == m.selectedProject {
 			if r.Hierarchy != nil {
+				if !first {
+					// Add a visual separator between different page trees
+					items = append(items, treeItem{label: "", level: 0})
+				}
+				
 				// Each report represents a PageTree entry point.
 				// We show each one as an independent tree.
 				items = append(items, m.flattenTree(r.Hierarchy, r, 0, true)...)
-				
-				// Add an empty item for visual separation between different page trees
-				items = append(items, treeItem{label: "", level: 0})
+				first = false
 			}
 		}
 	}
@@ -339,11 +373,13 @@ func (m *MainModel) flattenTree(node *domain.FileNode, report domain.ViolationRe
 	
 	// Create item for current node with the full report context and cycle marker
 	item := treeItem{
-		label:   node.FilePath,
-		level:   level,
-		isRoot:  isRoot,
-		isCycle: node.IsCycle,
-		report:  report,
+		label:        node.FilePath,
+		level:        level,
+		isRoot:       isRoot,
+		isCycle:      node.IsCycle,
+		isOpaque:     node.IsOpaque,
+		opaqueSource: node.OpaqueSource,
+		report:       report,
 	}
 	
 	items = append(items, item)

@@ -1,0 +1,29 @@
+A11ySentry Analysis Report - Mon, 11 May 2026 03:18:03 -03
+============================================================
+
+
+Page: Sources\MyApp\Views\MainView.swift
+  MainView.swift
+    └─ Environment.swift
+    └─ CustomButton.swift
+      └─ Environment.swift
+
+  Sources\MyApp\Views\MainView.swift:8:18  error    button missing accessible name or label.  [WCAG_4_1_2]
+  Sources\MyApp\Components\CustomButton.swift:8:12  error    button missing accessible name or label.  [WCAG_4_1_2]
+
+Page: Sources\MyApp\Views\LegacyViewController.swift
+  LegacyViewController.swift
+
+  Sources\MyApp\Views\LegacyViewController.swift:7:18  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]
+
+Page: Sources\MyApp\Views\ContentView.swift
+  ContentView.swift
+
+  Sources\MyApp\Views\ContentView.swift:11:16  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]
+  Sources\MyApp\Views\ContentView.swift:16:16  error    Mobile image missing content description. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.  [WCAG_1_1_1]
+  Sources\MyApp\Views\ContentView.swift:22:16  error    button missing accessible name or label.  [WCAG_4_1_2]
+
+Page: Package.swift
+  Package.swift
+
+  No violations found.

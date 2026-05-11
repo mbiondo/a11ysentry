@@ -49,7 +49,7 @@ func TestAngularAdapter_Bindings(t *testing.T) {
 			}
 		}
 		if n.Role == domain.RoleButton {
-			if val, ok := n.Traits["(click)"]; ok && val == "submit()" {
+			if val, ok := n.Traits["onclick"]; ok && val == "submit()" {
 				foundClick = true
 			}
 		}
@@ -62,6 +62,6 @@ func TestAngularAdapter_Bindings(t *testing.T) {
 		t.Errorf("Expected [alt] to be parsed as dynamicAlt")
 	}
 	if !foundClick {
-		t.Errorf("Expected (click) to be preserved in traits")
+		t.Errorf("Expected (click) to be parsed as onclick")
 	}
 }

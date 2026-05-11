@@ -16,6 +16,9 @@ import (
 	"golang.org/x/net/html"
 )
 
+// AttributeMapper allows frameworks to map custom attributes to standard HTML attributes.
+type AttributeMapper func(key, val string) (mappedKey string, mappedVal string)
+
 type htmlAdapter struct {
 	platform     domain.Platform
 	cssMap       map[string]map[string]string // className -> property -> value
@@ -23,39 +26,48 @@ type htmlAdapter struct {
 	customColors map[string]string            // Tailwind custom token name -> hex (resolved from CSS files)
 	cssVars      map[string]string            // CSS custom property name (--foo) -> hex
 	darkCSSVars  map[string]string            // CSS custom properties for dark mode
+	attrMapper   AttributeMapper              // maps framework-specific attributes
+}
+
+// NewHTMLAdapterWithMapper creates a new HTML adapter with a custom attribute mapper.
+func NewHTMLAdapterWithMapper(platform domain.Platform, mapper AttributeMapper) ports.Adapter {
+	return &htmlAdapter{
+		platform:     platform,
+		cssMap:       make(map[string]map[string]string),
+		darkCSSMap:   make(map[string]map[string]string),
+		customColors: make(map[string]string),
+		cssVars:      make(map[string]string),
+		darkCSSVars:  make(map[string]string),
+		attrMapper:   mapper,
+	}
+}
+
+func genericWebMapper(key, val string) (string, string) {
+	// Svelte/Solid events: on:click -> onclick
+	if strings.HasPrefix(key, "on:") {
+		return "on" + key[3:], val
+	}
+	// Svelte bindings: bind:alt -> alt
+	if strings.HasPrefix(key, "bind:") {
+		return key[5:], val
+	}
+	// React/JSX properties: htmlfor -> for
+	if key == "htmlfor" {
+		return "for", val
+	}
+	return key, val
 }
 
 func NewHTMLAdapter() ports.Adapter {
-	return &htmlAdapter{
-		platform:     domain.PlatformWebReact,
-		cssMap:       make(map[string]map[string]string),
-		darkCSSMap:   make(map[string]map[string]string),
-		customColors: make(map[string]string),
-		cssVars:      make(map[string]string),
-		darkCSSVars:  make(map[string]string),
-	}
+	return NewHTMLAdapterWithMapper(domain.PlatformWebReact, genericWebMapper)
 }
 
 func NewElectronAdapter() ports.Adapter {
-	return &htmlAdapter{
-		platform:     domain.PlatformElectron,
-		cssMap:       make(map[string]map[string]string),
-		darkCSSMap:   make(map[string]map[string]string),
-		customColors: make(map[string]string),
-		cssVars:      make(map[string]string),
-		darkCSSVars:  make(map[string]string),
-	}
+	return NewHTMLAdapterWithMapper(domain.PlatformElectron, nil)
 }
 
 func NewTauriAdapter() ports.Adapter {
-	return &htmlAdapter{
-		platform:     domain.PlatformTauri,
-		cssMap:       make(map[string]map[string]string),
-		darkCSSMap:   make(map[string]map[string]string),
-		customColors: make(map[string]string),
-		cssVars:      make(map[string]string),
-		darkCSSVars:  make(map[string]string),
-	}
+	return NewHTMLAdapterWithMapper(domain.PlatformTauri, nil)
 }
 
 func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]domain.USN, error) {
@@ -68,6 +80,10 @@ func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]doma
 func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string, inheritedHidden bool) ([]domain.USN, error) {
 	if node.IsCycle {
 		// Stop processing cycles to avoid redundant work and errors.
+		return nil, nil
+	}
+	if node.IsOpaque {
+		// Opaque nodes don't have source code to analyze.
 		return nil, nil
 	}
 	data, err := os.ReadFile(node.FilePath)
@@ -98,7 +114,22 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 
 	a.extractCSS(doc)
 
-	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG, inheritedHidden)
+	// Build a map of opaque children for quick lookup in traverse
+	opaqueMap := make(map[string]string)
+	for _, child := range node.Children {
+		if child.IsOpaque {
+			// Extract a possible tag name from the package path (e.g. @mui/material -> material)
+			// This is a heuristic. A better way would be parsing imports.
+			pkg := child.OpaqueSource
+			parts := strings.Split(pkg, "/")
+			name := parts[len(parts)-1]
+			opaqueMap[name] = pkg
+			// Also support the full package name if it's used as a tag
+			opaqueMap[pkg] = pkg
+		}
+	}
+
+	nodes := a.traverse(doc, node.FilePath, nil, cleanContent, isComponent, inheritedBG, inheritedFG, inheritedHidden, opaqueMap)
 
 	childBG := inheritedBG
 	childFG := inheritedFG
@@ -256,38 +287,22 @@ func (a *htmlAdapter) resolveVar(val string) string {
 	return val
 }
 
-func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fullContent string, isComponent bool, inheritedBG string, inheritedFG string, inheritedHidden bool) []domain.USN {
+func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fullContent string, isComponent bool, inheritedBG string, inheritedFG string, inheritedHidden bool, opaqueMap map[string]string) []domain.USN {
 	var nodes []domain.USN
 
 	if n.Type == html.ElementNode {
 		raw := a.renderNode(n)
 		line, col := a.findPosition(n, fullContent)
 
-		// Check for preceding comments to support a11y-ignore
-		var ignoredRules []string
-		for prev := n.PrevSibling; prev != nil; prev = prev.PrevSibling {
-			// Skip whitespace text nodes to find adjacent comments
-			if prev.Type == html.TextNode && strings.TrimSpace(prev.Data) == "" {
-				continue
-			}
-			if prev.Type == html.CommentNode {
-				comment := strings.TrimSpace(prev.Data)
-				if strings.HasPrefix(comment, "a11y-ignore:") {
-					rulesPart := strings.TrimPrefix(comment, "a11y-ignore:")
-					for _, r := range strings.Split(rulesPart, ",") {
-						ignoredRules = append(ignoredRules, strings.TrimSpace(r))
-					}
-				}
-			}
-			// Only look at the immediate preceding non-whitespace node
-			break
-		}
+		isOpaque, opaqueSource := a.getOpaqueComponentInfo(n, opaqueMap)
+		ignoredRules := a.getA11yIgnoreRules(n)
 
 		usn := domain.USN{
-			UID:    a.getAttribute(n, "id"),
-			Role:   a.mapRole(n.Data),
-			Label:  a.getLabel(n),
-			Traits: make(map[string]any),
+			UID:      a.getAttribute(n, "id"),
+			Role:     a.mapRole(n.Data),
+			Label:    a.getLabel(n),
+			IsOpaque: isOpaque,
+			Traits:   make(map[string]any),
 			Source: domain.Source{
 				Platform:     a.platform,
 				FilePath:     filename,
@@ -295,6 +310,8 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				Column:       col,
 				RawHTML:      raw,
 				IsComponent:  isComponent,
+				IsOpaque:     isOpaque,
+				OpaqueSource: opaqueSource,
 				IgnoredRules: ignoredRules,
 			},
 		}
@@ -304,140 +321,15 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 		}
 
 		if ariaRole := a.getAttribute(n, "role"); ariaRole != "" {
-			switch ariaRole {
-			case "button":
-				usn.Role = domain.RoleButton
-			case "link":
-				usn.Role = domain.RoleLink
-			case "heading":
-				usn.Role = domain.RoleHeading
-			case "dialog", "alertdialog":
-				usn.Role = domain.RoleModal
-			case "main":
-				usn.Role = domain.RoleMain
-			case "navigation":
-				usn.Role = domain.RoleNav
-			case "complementary":
-				usn.Role = domain.RoleAside
-			case "banner":
-				usn.Role = domain.RoleHeader
-			case "contentinfo":
-				usn.Role = domain.RoleFooter
-			case "region":
-				usn.Role = domain.RoleSection
-			case "form":
-				usn.Role = domain.RoleForm
-			case "search":
-				usn.Role = domain.RoleSearch
-			case "status", "alert", "log":
-				usn.Role = domain.RoleLiveRegion
-			}
+			usn.Role = a.mapAriaRole(ariaRole)
 		}
 		if usn.UID == "" {
 			usn.UID = n.Data
 		}
 
-		if classAttr := a.getAttribute(n, "class"); classAttr != "" {
-			classes := strings.Fields(classAttr)
-			for _, c := range classes {
-				if props, ok := a.cssMap[c]; ok {
-					for k, v := range props {
-						usn.Traits[k] = a.resolveVar(v)
-					}
-				}
-			}
-		}
-
-		for _, attr := range n.Attr {
-			if attr.Key == "id" || attr.Key == "lang" || attr.Key == "type" || attr.Key == "class" || attr.Key == "className" || attr.Key == "for" ||
-				attr.Key == "aria-pressed" || attr.Key == "aria-expanded" || attr.Key == "aria-checked" || attr.Key == "role" ||
-				attr.Key == "tabindex" || attr.Key == "aria-live" || attr.Key == "href" || attr.Key == "title" || attr.Key == "autocomplete" || attr.Key == "aria-hidden" ||
-				attr.Key == "onclick" || attr.Key == "onkeydown" || attr.Key == "onkeyup" || attr.Key == "onkeypress" ||
-				attr.Key == "@click" || attr.Key == "v-on:click" || attr.Key == "(click)" || attr.Key == "on:click" ||
-				attr.Key == "@keydown" || attr.Key == "v-on:keydown" || attr.Key == "(keydown)" || attr.Key == "on:keydown" ||
-				attr.Key == "@keyup" || attr.Key == "v-on:keyup" || attr.Key == "(keyup)" || attr.Key == "on:keyup" ||
-				attr.Key == "@keypress" || attr.Key == "v-on:keypress" || attr.Key == "(keypress)" || attr.Key == "on:keypress" {
-				usn.Traits[attr.Key] = attr.Val
-			}
-
-			if attr.Key == "htmlfor" && attr.Val != "" {
-				usn.Traits["htmlFor"] = attr.Val
-			}
-			if (attr.Key == "[alt]" || attr.Key == "v-bind:alt" || attr.Key == ":alt" || attr.Key == "[attr.alt]") && attr.Val != "" {
-				usn.Label = "{{" + attr.Val + "}}"
-			}
-
-			if attr.Key == "class" || attr.Key == "className" {
-				classes := strings.Fields(attr.Val)
-				for _, c := range classes {
-					if strings.HasPrefix(c, "w-") {
-						var val float64
-						if _, err := fmt.Sscanf(c, "w-%f", &val); err == nil {
-							usn.Traits["width"] = val * 4
-						}
-					}
-					if strings.HasPrefix(c, "h-") {
-						var val float64
-						if _, err := fmt.Sscanf(c, "h-%f", &val); err == nil {
-							usn.Traits["height"] = val * 4
-						}
-					}
-					if strings.HasPrefix(c, "text-") {
-						if hex := a.mapTailwindColor(c); hex != "" {
-							usn.Traits["color"] = hex
-						}
-					}
-					if strings.HasPrefix(c, "bg-") {
-						if hex := a.mapTailwindColor(c); hex != "" {
-							usn.Traits["background-color"] = hex
-						}
-					}
-					if strings.HasPrefix(c, "border-") {
-						if hex := a.mapTailwindColor(c); hex != "" {
-							usn.Traits["border-color"] = hex
-						}
-					}
-					if c == "no-underline" {
-						usn.Traits["no-underline"] = true
-					}
-					if strings.HasPrefix(c, "dark:text-") {
-						if hex := a.mapTailwindColor("text-" + strings.TrimPrefix(c, "dark:text-")); hex != "" {
-							usn.Traits["dark:color"] = hex
-						}
-					}
-					if strings.HasPrefix(c, "dark:bg-") {
-						if hex := a.mapTailwindColor("bg-" + strings.TrimPrefix(c, "dark:bg-")); hex != "" {
-							usn.Traits["dark:background-color"] = hex
-						}
-					}
-				}
-			}
-
-			if attr.Key == "style" {
-				parts := strings.Split(attr.Val, ";")
-				for _, p := range parts {
-					kv := strings.Split(p, ":")
-					if len(kv) < 2 {
-						continue
-					}
-					key := strings.TrimSpace(kv[0])
-					val := strings.TrimSpace(strings.Join(kv[1:], ":"))
-					if key == "color" || key == "background-color" || key == "border-color" {
-						if strings.HasPrefix(val, "#") {
-							usn.Traits[key] = val
-						} else if strings.HasPrefix(val, "rgb(") {
-							if hex := a.normalizeColor(val); hex != "" {
-								usn.Traits[key] = hex
-							}
-						} else if strings.HasPrefix(val, "var(") {
-							if res := a.resolveVar(val); res != val {
-								usn.Traits[key] = res
-							}
-						}
-					}
-				}
-			}
-		}
+		a.mapAttributes(n, &usn)
+		a.processCSSClasses(n, &usn)
+		a.processInlineStyles(n, &usn)
 
 		if _, hasBG := usn.Traits["background-color"]; !hasBG && inheritedBG != "" {
 			usn.Traits["background-color"] = inheritedBG
@@ -466,10 +358,174 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 	}
 
 	for c := n.FirstChild; c != nil; c = c.NextSibling {
-		nodes = append(nodes, a.traverse(c, filename, lines, fullContent, isComponent, childBG, childFG, childHidden)...)
+		nodes = append(nodes, a.traverse(c, filename, lines, fullContent, isComponent, childBG, childFG, childHidden, opaqueMap)...)
 	}
 
 	return nodes
+}
+
+func (a *htmlAdapter) getOpaqueComponentInfo(n *html.Node, opaqueMap map[string]string) (bool, string) {
+	isCustom := (len(n.Data) > 0 && n.Data[0] >= 'A' && n.Data[0] <= 'Z')
+	for k, v := range opaqueMap {
+		if strings.EqualFold(n.Data, k) || strings.Contains(strings.ToLower(n.Data), strings.ToLower(k)) {
+			return true, v
+		}
+	}
+	return isCustom, ""
+}
+
+func (a *htmlAdapter) getA11yIgnoreRules(n *html.Node) []string {
+	var ignoredRules []string
+	for prev := n.PrevSibling; prev != nil; prev = prev.PrevSibling {
+		if prev.Type == html.TextNode && strings.TrimSpace(prev.Data) == "" {
+			continue
+		}
+		if prev.Type == html.CommentNode {
+			comment := strings.TrimSpace(prev.Data)
+			if strings.HasPrefix(comment, "a11y-ignore:") {
+				rulesPart := strings.TrimPrefix(comment, "a11y-ignore:")
+				for _, r := range strings.Split(rulesPart, ",") {
+					ignoredRules = append(ignoredRules, strings.TrimSpace(r))
+				}
+			}
+		}
+		break
+	}
+	return ignoredRules
+}
+
+func (a *htmlAdapter) mapAriaRole(ariaRole string) domain.SemanticRole {
+	switch ariaRole {
+	case "button": return domain.RoleButton
+	case "link": return domain.RoleLink
+	case "heading": return domain.RoleHeading
+	case "dialog", "alertdialog": return domain.RoleModal
+	case "main": return domain.RoleMain
+	case "navigation": return domain.RoleNav
+	case "complementary": return domain.RoleAside
+	case "banner": return domain.RoleHeader
+	case "contentinfo": return domain.RoleFooter
+	case "region": return domain.RoleSection
+	case "form": return domain.RoleForm
+	case "search": return domain.RoleSearch
+	case "status", "alert", "log": return domain.RoleLiveRegion
+	default: return domain.SemanticRole(ariaRole)
+	}
+}
+
+func (a *htmlAdapter) mapAttributes(n *html.Node, usn *domain.USN) {
+	for _, attr := range n.Attr {
+		k, v := attr.Key, attr.Val
+		if a.attrMapper != nil {
+			k, v = a.attrMapper(k, v)
+			if k == "" {
+				continue
+			}
+		}
+		
+		switch k {
+		case "id", "lang", "type", "class", "className", "for", "aria-pressed", "aria-expanded", "aria-checked", "role", "tabindex", "aria-live", "href", "title", "autocomplete", "aria-hidden", "onclick", "onkeydown", "onkeyup", "onkeypress":
+			usn.Traits[k] = v
+		case "htmlfor":
+			if v != "" {
+				usn.Traits["htmlFor"] = v
+			}
+		case "alt":
+			if v != "" {
+				usn.Label = v
+			}
+		}
+	}
+}
+
+func (a *htmlAdapter) processCSSClasses(n *html.Node, usn *domain.USN) {
+	classAttr := a.getAttribute(n, "class")
+	if classAttr == "" {
+		classAttr = a.getAttribute(n, "className")
+	}
+	if classAttr == "" {
+		return
+	}
+
+	classes := strings.Fields(classAttr)
+	for _, c := range classes {
+		if props, ok := a.cssMap[c]; ok {
+			for k, v := range props {
+				usn.Traits[k] = a.resolveVar(v)
+			}
+		}
+		
+		if strings.HasPrefix(c, "w-") {
+			var val float64
+			if _, err := fmt.Sscanf(c, "w-%f", &val); err == nil {
+				usn.Traits["width"] = val * 4
+			}
+		}
+		if strings.HasPrefix(c, "h-") {
+			var val float64
+			if _, err := fmt.Sscanf(c, "h-%f", &val); err == nil {
+				usn.Traits["height"] = val * 4
+			}
+		}
+		if strings.HasPrefix(c, "text-") {
+			if hex := a.mapTailwindColor(c); hex != "" {
+				usn.Traits["color"] = hex
+			}
+		}
+		if strings.HasPrefix(c, "bg-") {
+			if hex := a.mapTailwindColor(c); hex != "" {
+				usn.Traits["background-color"] = hex
+			}
+		}
+		if strings.HasPrefix(c, "border-") {
+			if hex := a.mapTailwindColor(c); hex != "" {
+				usn.Traits["border-color"] = hex
+			}
+		}
+		if c == "no-underline" {
+			usn.Traits["no-underline"] = true
+		}
+		if strings.HasPrefix(c, "dark:text-") {
+			if hex := a.mapTailwindColor("text-" + strings.TrimPrefix(c, "dark:text-")); hex != "" {
+				usn.Traits["dark:color"] = hex
+			}
+		}
+		if strings.HasPrefix(c, "dark:bg-") {
+			if hex := a.mapTailwindColor("bg-" + strings.TrimPrefix(c, "dark:bg-")); hex != "" {
+				usn.Traits["dark:background-color"] = hex
+			}
+		}
+	}
+}
+
+func (a *htmlAdapter) processInlineStyles(n *html.Node, usn *domain.USN) {
+	styleAttr := a.getAttribute(n, "style")
+	if styleAttr == "" {
+		return
+	}
+	
+	parts := strings.Split(styleAttr, ";")
+	for _, p := range parts {
+		kv := strings.Split(p, ":")
+		if len(kv) < 2 {
+			continue
+		}
+		key := strings.TrimSpace(kv[0])
+		val := strings.TrimSpace(strings.Join(kv[1:], ":"))
+		if key == "color" || key == "background-color" || key == "border-color" {
+			if strings.HasPrefix(val, "#") {
+				usn.Traits[key] = val
+			} else if strings.HasPrefix(val, "rgb(") {
+				if hex := a.normalizeColor(val); hex != "" {
+					usn.Traits[key] = hex
+				}
+			} else if strings.HasPrefix(val, "var(") {
+				if res := a.resolveVar(val); res != val {
+					usn.Traits[key] = res
+				}
+			}
+		}
+	}
 }
 
 func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
@@ -511,12 +567,13 @@ func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
 
 func (a *htmlAdapter) getLabel(n *html.Node) string {
 	for _, attr := range n.Attr {
-		if attr.Key == "aria-label" || attr.Key == "alt" || attr.Key == ":alt" || attr.Key == "bind:alt" || attr.Key == "v-bind:alt" || attr.Key == "[alt]" || attr.Key == "[attr.alt]" || attr.Key == "[attr.aria-label]" {
-			if strings.TrimSpace(attr.Val) != "" {
-				if attr.Key == ":alt" || attr.Key == "bind:alt" || attr.Key == "v-bind:alt" || attr.Key == "[alt]" || attr.Key == "[attr.alt]" || attr.Key == "[attr.aria-label]" {
-					return "{{" + attr.Val + "}}"
-				}
-				return attr.Val
+		k, v := attr.Key, attr.Val
+		if a.attrMapper != nil {
+			k, v = a.attrMapper(k, v)
+		}
+		if k == "aria-label" || k == "alt" {
+			if strings.TrimSpace(v) != "" {
+				return v
 			}
 		}
 	}

@@ -235,7 +235,7 @@ type ProjectFramework interface {
 
 	// ResolveImports returns the absolute paths of project-local files imported
 	// by filePath. External packages (node_modules) are ignored.
-	ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string
+	ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *TSConfigPaths) []string
 
 	// BuildPageTrees groups files into analysis units given the full import
 	// graph (file → []imported abs paths).

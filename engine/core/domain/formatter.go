@@ -117,3 +117,10 @@ func flattenHierarchy(n *FileNode, depth int, rel string, res *[]string) {
 		flattenHierarchy(child, depth+1, "child", res)
 	}
 }
+
+// CombinedReportToTOON returns a string containing both violations and the hierarchy in TOON format.
+func CombinedReportToTOON(violations []Violation, root *FileNode) string {
+	vToon := ToTOON(violations)
+	hToon := HierarchyToTOON(root, "")
+	return vToon + "\n\n" + hToon
+}

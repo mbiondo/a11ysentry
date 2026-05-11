@@ -208,3 +208,52 @@ func TestAccessibilityAnalyzer_Analyze(t *testing.T) {
 		})
 	}
 }
+
+func TestCalculateOpacity(t *testing.T) {
+	tests := []struct {
+		name  string
+		nodes []USN
+		want  float64
+	}{
+		{
+			name: "All local",
+			nodes: []USN{
+				{UID: "a", IsOpaque: false},
+				{UID: "b", IsOpaque: false},
+			},
+			want: 0.0,
+		},
+		{
+			name: "All opaque",
+			nodes: []USN{
+				{UID: "a", IsOpaque: true},
+				{UID: "b", IsOpaque: true},
+			},
+			want: 100.0,
+		},
+		{
+			name: "Mixed",
+			nodes: []USN{
+				{UID: "a", IsOpaque: true},
+				{UID: "b", IsOpaque: false},
+				{UID: "c", IsOpaque: false},
+				{UID: "d", IsOpaque: false},
+			},
+			want: 25.0,
+		},
+		{
+			name:  "Empty",
+			nodes: []USN{},
+			want:  0.0,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := CalculateOpacity(tt.nodes)
+			if got != tt.want {
+				t.Errorf("expected %f, got %f", tt.want, got)
+			}
+		})
+	}
+}

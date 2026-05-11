@@ -84,8 +84,20 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 	return uiFiles, cssFiles, err
 }
 
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
+	mergedAliases := &scanner.TSConfigPaths{
+		BaseURL: ".",
+		Paths: map[string]string{
+			"@/*": "src",
+		},
+	}
+	if aliases != nil {
+		mergedAliases.BaseURL = aliases.BaseURL
+		for k, v := range aliases.Paths {
+			mergedAliases.Paths[k] = v
+		}
+	}
+	return scanner.ResolveImports(filePath, projectRoot, fileSet, mergedAliases)
 }
 
 func (f *Framework) BuildPageTrees(

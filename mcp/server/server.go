@@ -29,6 +29,8 @@ import (
 	astrofw "a11ysentry/scanner/astro"
 	"a11ysentry/scanner/generic"
 	iosfw "a11ysentry/scanner/ios"
+	flutterfw "a11ysentry/scanner/flutter"
+	rnfw "a11ysentry/scanner/reactnative"
 	"a11ysentry/scanner/nextjs"
 	"a11ysentry/scanner/nuxt"
 	"a11ysentry/scanner/sveltekit"
@@ -56,7 +58,7 @@ func Start(repo ports.Repository) {
 	// Create MCP server
 	s := mcpserver.NewMCPServer(
 		"A11ySentry MCP Server",
-		"1.0.0",
+		"0.1.0",
 		mcpserver.WithLogging(),
 	)
 
@@ -143,6 +145,8 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 			electronfw.New(),
 			androidfw.New(),
 			iosfw.New(),
+			flutterfw.New(),
+			rnfw.New(),
 			generic.New(),
 		)
 
@@ -178,12 +182,14 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 
 			// Persist to repository
 			report := domain.ViolationReport{
-				ProjectName: filepath.Base(root),
-				ProjectRoot: root,
-				FilePath:    tree.Label,
-				Platform:    platform,
-				Timestamp:   time.Now().Unix(),
-				Violations:  violations,
+				ProjectName:   filepath.Base(root),
+				ProjectRoot:   root,
+				FilePath:      tree.Label,
+				Platform:      platform,
+				Timestamp:     time.Now().Unix(),
+				Violations:    violations,
+				Hierarchy:     tree.Root,
+				OpacityMetric: domain.CalculateOpacity(nodes),
 			}
 			_ = srv.repo.SaveReport(ctx, report)
 		}
@@ -265,12 +271,14 @@ func (srv *MCPServer) analyzeFiles(ctx context.Context, paths []string, original
 
 		// Persist to repository
 		report := domain.ViolationReport{
-			ProjectName: filepath.Base(dir),
-			ProjectRoot: dir,
-			FilePath:    absPath,
-			Platform:    platform,
-			Timestamp:   time.Now().Unix(),
-			Violations:  violations,
+			ProjectName:   filepath.Base(dir),
+			ProjectRoot:   dir,
+			FilePath:      absPath,
+			Platform:      platform,
+			Timestamp:     time.Now().Unix(),
+			Violations:    violations,
+			Hierarchy:     rootNode,
+			OpacityMetric: domain.CalculateOpacity(nodes),
 		}
 		_ = srv.repo.SaveReport(ctx, report)
 	}
@@ -304,7 +312,7 @@ func (srv *MCPServer) contextHandler(ctx context.Context, request mcp.CallToolRe
 		nextjs.New(), astrofw.New(), nuxt.New(), sveltekit.New(),
 		django.New(), flask.New(), angular.New(), vue.New(),
 		dotnetfw.New(), pyqtfw.New(), electronfw.New(), androidfw.New(),
-		iosfw.New(), generic.New(),
+		iosfw.New(), flutterfw.New(), rnfw.New(), generic.New(),
 	)
 
 	// 3. Scan and build trees

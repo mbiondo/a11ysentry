@@ -76,7 +76,8 @@ func (m MainModel) resultsView() string {
 		BorderForeground(lipgloss.Color("#00ADD8")).
 		Padding(0, 1).
 		Width(contentWidth).
-		Render(fmt.Sprintf("SUMMARY\n\n🔴 %d Errors  🟠 %d Warnings\nTop Issue: %s", errors, warnings, getTopIssue(errorTypes)))
+		Render(fmt.Sprintf("SUMMARY\n\n🔴 %d Errors  🟠 %d Warnings  ⚪ %.1f%% Opacity\nTop Issue: %s", 
+			errors, warnings, m.results.OpacityMetric, getTopIssue(errorTypes)))
 
 	b.WriteString(summaryCard + "\n\n")
 

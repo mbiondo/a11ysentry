@@ -51,7 +51,7 @@ var (
 
 // ResolveImports implements Flutter-specific import resolution.
 // It handles both relative imports and 'package:PROJECT_NAME/...' style imports.
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil

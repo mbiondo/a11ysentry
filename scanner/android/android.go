@@ -51,13 +51,15 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 }
 
 var (
-	kotlinImportRe  = regexp.MustCompile(`(?m)^import\s+([\w.]+)`)
-	androidLayoutRe = regexp.MustCompile(`R\.layout\.(\w+)`)
+	kotlinImportRe      = regexp.MustCompile(`(?m)^import\s+([\w.]+)`)
+	androidLayoutRe     = regexp.MustCompile(`R\.layout\.(\w+)`)
 	androidXmlIncludeRe = regexp.MustCompile(`<include\s+layout="@layout/(\w+)"`)
+	kotlinComposableRe  = regexp.MustCompile(`([A-Z]\w+)\(`)
+	kotlinDefRe         = regexp.MustCompile(`(?m)^fun\s+([A-Z]\w+)\s*\(`)
 )
 
 // ResolveImports implements Android-specific import resolution.
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil
@@ -66,23 +68,32 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 
 	var resolved []string
 	ext := strings.ToLower(filepath.Ext(filePath))
+	
+	// Fast lookup map for class names and Composables in the project
+	symbolMap := make(map[string]string)
+	for f := range fileSet {
+		c, _ := os.ReadFile(f)
+		defs := kotlinDefRe.FindAllStringSubmatch(string(c), -1)
+		for _, d := range defs {
+			symbolMap[d[1]] = f
+		}
+		// Also keep filename as fallback for classes
+		base := strings.TrimSuffix(filepath.Base(f), filepath.Ext(f))
+		symbolMap[base] = f
+	}
 
 	switch ext {
 	case ".kt", ".java":
 		// 1. Handle Kotlin/Java package imports
-		// Example: import com.example.components.Header -> com/example/components/Header.kt
 		matches := kotlinImportRe.FindAllStringSubmatch(src, -1)
 		for _, m := range matches {
 			pkgPath := strings.ReplaceAll(m[1], ".", string(filepath.Separator))
-
-			// Try to find the file in common source sets
 			prefixes := []string{
 				filepath.Join(projectRoot, "app", "src", "main", "java"),
 				filepath.Join(projectRoot, "app", "src", "main", "kotlin"),
 				filepath.Join(projectRoot, "src", "main", "java"),
 				filepath.Join(projectRoot, "src", "main", "kotlin"),
 			}
-
 			for _, prefix := range prefixes {
 				candidate := filepath.Join(prefix, pkgPath)
 				for _, ext := range []string{".kt", ".java"} {
@@ -108,8 +119,19 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 				}
 			}
 		}
+		
+		// 3. Handle Composable/Component calls in same package or via wildcards
+		compMatches := kotlinComposableRe.FindAllStringSubmatch(src, -1)
+		for _, m := range compMatches {
+			name := m[1]
+			if realPath, ok := symbolMap[name]; ok {
+				if realPath != filePath {
+					resolved = append(resolved, realPath)
+				}
+			}
+		}
 	case ".xml":
-		// 3. Handle XML <include layout="@layout/xxx" />
+		// 4. Handle XML <include layout="@layout/xxx" />
 		includeMatches := androidXmlIncludeRe.FindAllStringSubmatch(src, -1)
 		for _, m := range includeMatches {
 			layoutName := m[1]

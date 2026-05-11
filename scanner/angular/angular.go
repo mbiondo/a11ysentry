@@ -56,7 +56,7 @@ var (
 	angularStyleRe    = regexp.MustCompile(`styleUrls\s*:\s*\[\s*['"]([^'"]+)['"]`)
 )
 
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil
@@ -64,7 +64,7 @@ func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[str
 	src := string(content)
 
 	// 1. Standard TS imports
-	resolved := scanner.ResolveImports(filePath, projectRoot, fileSet)
+	resolved := scanner.ResolveImports(filePath, projectRoot, fileSet, aliases)
 	
 	base := filepath.Dir(filePath)
 

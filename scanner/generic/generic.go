@@ -59,8 +59,8 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 }
 
 // ResolveImports delegates to the shared resolver.
-func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool) []string {
-	return scanner.ResolveImports(filePath, projectRoot, fileSet)
+func (f *Framework) ResolveImports(filePath, projectRoot string, fileSet map[string]bool, aliases *scanner.TSConfigPaths) []string {
+	return scanner.ResolveImports(filePath, projectRoot, fileSet, aliases)
 }
 
 // BuildPageTrees treats every file that is not imported by any other file as a

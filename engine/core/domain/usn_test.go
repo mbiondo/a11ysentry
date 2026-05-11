@@ -34,3 +34,29 @@ func TestUSNCreation(t *testing.T) {
 	}
 }
 
+func TestOpaqueNodeCreation(t *testing.T) {
+	// GIVEN an external component instantiation
+	// WHEN a USN marked as opaque is created
+	usn := USN{
+		UID:   "opaque-btn",
+		Role:  "generic",
+		IsOpaque: true,
+		Source: Source{
+			Platform:     PlatformWebReact,
+			IsOpaque:     true,
+			OpaqueSource: "@mui/material",
+		},
+	}
+
+	// THEN it MUST reflect the opacity metadata
+	if !usn.IsOpaque {
+		t.Error("expected USN to be marked as opaque")
+	}
+	if !usn.Source.IsOpaque {
+		t.Error("expected Source to be marked as opaque")
+	}
+	if usn.Source.OpaqueSource != "@mui/material" {
+		t.Errorf("expected OpaqueSource '@mui/material', got %s", usn.Source.OpaqueSource)
+	}
+}
+
