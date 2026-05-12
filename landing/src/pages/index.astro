@@ -42,15 +42,27 @@ import '../styles/global.css';
                         <div class="space-y-4 font-mono text-xs text-left">
                             <div class="space-y-2">
                                 <div class="text-slate-500 text-[9px] uppercase font-bold tracking-tighter">PowerShell (Admin)</div>
-                                <code class="block bg-slate-900/50 p-3 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover:border-neon-cyan/30 transition-colors">
-                                    irm https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.ps1 | iex
-                                </code>
+                                <div class="relative group/copy">
+                                    <code id="cmd-pwsh" class="block bg-slate-900/50 p-3 pr-12 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover/copy:border-neon-cyan/30 transition-colors">
+                                        irm https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.ps1 | iex
+                                    </code>
+                                    <button data-copy="cmd-pwsh" class="absolute top-1/2 right-2 -translate-y-1/2 p-2 rounded-lg bg-slate-800/80 opacity-0 group-hover/copy:opacity-100 hover:bg-slate-700 transition-all duration-200 text-slate-400 hover:text-white" aria-label="Copy PowerShell command">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <span class="copied-text hidden text-neon-emerald text-[10px] font-bold">Copied!</span>
+                                    </button>
+                                </div>
                             </div>
                             <div class="space-y-2">
                                 <div class="text-slate-500 text-[9px] uppercase font-bold tracking-tighter">Bash / Zsh</div>
-                                <code class="block bg-slate-900/50 p-3 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover:border-neon-emerald/30 transition-colors">
-                                    curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
-                                </code>
+                                <div class="relative group/copy">
+                                    <code id="cmd-bash" class="block bg-slate-900/50 p-3 pr-12 rounded-xl text-slate-300 border border-slate-800/50 break-all group-hover/copy:border-neon-emerald/30 transition-colors">
+                                        curl -sSL https://raw.githubusercontent.com/mbiondo/a11ysentry/main/install.sh | bash
+                                    </code>
+                                    <button data-copy="cmd-bash" class="absolute top-1/2 right-2 -translate-y-1/2 p-2 rounded-lg bg-slate-800/80 opacity-0 group-hover/copy:opacity-100 hover:bg-slate-700 transition-all duration-200 text-slate-400 hover:text-white" aria-label="Copy Bash command">
+                                        <svg class="w-4 h-4 copy-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                        <span class="copied-text hidden text-neon-emerald text-[10px] font-bold">Copied!</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -78,3 +90,34 @@ import '../styles/global.css';
         scrollbar-width: none;
     }
 </style>
+
+<script>
+    document.querySelectorAll('[data-copy]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-copy');
+            const code = document.getElementById(id);
+            if (!code) return;
+            const text = code.textContent.trim();
+            navigator.clipboard.writeText(text).then(() => {
+                const icon = btn.querySelector('.copy-icon');
+                const label = btn.querySelector('.copied-text');
+                if (icon) icon.classList.add('hidden');
+                if (label) label.classList.remove('hidden');
+                setTimeout(() => {
+                    if (icon) icon.classList.remove('hidden');
+                    if (label) label.classList.add('hidden');
+                }, 2000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.opacity = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            });
+        });
+    });
+</script>
