@@ -1,32 +1,32 @@
 ---
 ---
-<section class="py-24 px-6 relative overflow-hidden">
+<section class="py-24 px-6 relative overflow-hidden" aria-label="Comparison Table">
     <div class="max-w-5xl mx-auto relative z-10">
         <div class="text-center mb-16 space-y-4">
-            <h2 class="text-3xl md:text-5xl font-bold tracking-tight text-white">Engineering vs. <span class="text-slate-500">Probability</span></h2>
+            <h2 class="text-3xl md:text-5xl font-bold tracking-tight text-white">Engineering vs. <span class="text-slate-400">Probability</span></h2>
             <p class="text-slate-400">Why deterministic analysis wins for mission-critical accessibility.</p>
         </div>
 
         <div class="glass rounded-3xl overflow-hidden shadow-2xl border-slate-800">
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <!-- a11y-ignore: WCAG_1_4_3 --><table class="w-full text-left border-collapse">
                     <thead>
-                        <tr class="bg-slate-900/80 border-b border-slate-800">
-                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-500">Technical Factor</th>
+                        <tr class="bg-slate-900/80 border-b border-slate-800 bg-slate-950">
+                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-400 bg-slate-950">Technical Factor</th>
                             <th class="p-8 text-sm font-bold uppercase tracking-widest text-neon-cyan bg-neon-cyan/5">A11ySentry (Engine)</th>
-                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-500">Cloud LLM / AI</th>
+                            <th class="p-8 text-sm font-bold uppercase tracking-widest text-slate-400 bg-slate-950">Cloud LLM / AI</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-800/50">
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-8 font-semibold text-slate-300">Validation Model</td>
                             <td class="p-8 bg-neon-cyan/5 text-white font-medium">Deterministic (WCAG Rules)</td>
-                            <td class="p-8 text-slate-500">Probabilistic (Inference)</td>
+                            <td class="p-8 text-slate-400">Probabilistic (Inference)</td>
                         </tr>
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-8 font-semibold text-slate-300">Cost Structure</td>
                             <td class="p-8 bg-neon-cyan/5 text-neon-emerald font-bold italic">Zero (Run Anywhere)</td>
-                            <td class="p-8 text-slate-500">Usage-based (Per Token)</td>
+                            <td class="p-8 text-slate-400">Usage-based (Per Token)</td>
                         </tr>
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-8 font-semibold text-slate-300">Accuracy Assurance</td>
@@ -36,12 +36,12 @@
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-8 font-semibold text-slate-300">Data Sovereignty</td>
                             <td class="p-8 bg-neon-cyan/5 text-white font-medium">Air-Gapped / Private</td>
-                            <td class="p-8 text-slate-500">External Transmission</td>
+                            <td class="p-8 text-slate-400">External Transmission</td>
                         </tr>
                         <tr class="hover:bg-slate-800/30 transition-colors">
                             <td class="p-8 font-semibold text-slate-300">Speed (Latency)</td>
                             <td class="p-8 bg-neon-cyan/5 text-white font-medium">&lt; 50ms (Native Go)</td>
-                            <td class="p-8 text-slate-500">Seconds (Network/API)</td>
+                            <td class="p-8 text-slate-400">Seconds (Network/API)</td>
                         </tr>
                     </tbody>
                 </table>

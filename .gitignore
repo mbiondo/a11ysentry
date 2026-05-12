@@ -51,3 +51,7 @@ logs/
 *.tmp
 *.cache
 .cache/
+
+# Analysis report outputs
+2026-05-*.txt
+cmd/a11ysentry/2026-05-*.txt

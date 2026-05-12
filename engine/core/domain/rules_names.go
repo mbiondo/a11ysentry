@@ -17,6 +17,19 @@ func (r *ruleAccessibleNames) Execute(ctx context.Context, analysisCtx *Analysis
 
 	for _, node := range analysisCtx.Nodes {
 		if node.Role == RoleButton || node.Role == RoleLink || node.Role == RoleInput {
+			// Skip nodes where props may arrive via JSX spread — label is indeterminate.
+			if v, ok := node.Traits["has-spread-props"].(bool); ok && v {
+				continue
+			}
+
+			// Skip nodes whose source position could not be resolved (1:1 fallback).
+			// These are typically opaque library components (e.g. shadcn Select, Radix Input)
+			// that render their own native element internally — the label comes from within
+			// the component and cannot be inspected statically.
+			if node.Source.Line == 1 && node.Source.Column == 1 {
+				continue
+			}
+
 			effectiveLabel := node.Label
 			if node.Role == RoleInput {
 				if id, ok := node.Traits["id"].(string); ok {

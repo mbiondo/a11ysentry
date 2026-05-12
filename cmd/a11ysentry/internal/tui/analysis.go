@@ -4,6 +4,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"strings"
 	"fmt"
+
+	"a11ysentry/engine/core/domain"
 )
 
 var (
@@ -26,6 +28,9 @@ var (
 	labelStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("#00ADD8")).
 			Bold(true)
+
+	mutedStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("242"))
 )
 
 func getTopIssue(counts map[string]int) string {
@@ -59,16 +64,21 @@ func (m MainModel) resultsView() string {
 		contentWidth = m.terminalW - 6
 	}
 
+	// Deduplicate violations for this report context.
+	// We wrap the single report in a slice to reuse the cross-tree dedup logic,
+	// which also handles intra-report duplicates consistently.
+	uniqueViolations := domain.DeduplicateCrossTree([]domain.ViolationReport{m.results})
+
 	errors := 0
 	warnings := 0
 	errorTypes := make(map[string]int)
-	for _, v := range m.results.Violations {
-		if v.Severity == "error" {
+	for _, uv := range uniqueViolations {
+		if uv.Violation.Severity == domain.SeverityError {
 			errors++
 		} else {
 			warnings++
 		}
-		errorTypes[v.ErrorCode]++
+		errorTypes[uv.Violation.ErrorCode]++
 	}
 
 	summaryCard := lipgloss.NewStyle().
@@ -81,9 +91,10 @@ func (m MainModel) resultsView() string {
 
 	b.WriteString(summaryCard + "\n\n")
 
-	for _, v := range m.results.Violations {
+	for _, uv := range uniqueViolations {
+		v := uv.Violation
 		var severityTag string
-		if v.Severity == "error" {
+		if v.Severity == domain.SeverityError {
 			severityTag = errorStyle.Render(" ERROR ")
 		} else {
 			severityTag = warningStyle.Render(" WARNING ")
@@ -106,8 +117,13 @@ func (m MainModel) resultsView() string {
 			content.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Width(contentWidth-6).Render(v.FixSnippet) + "\n\n")
 		}
 
+		// Show page count annotation if this violation appeared in multiple pages
+		if uv.PageCount > 1 {
+			content.WriteString(mutedStyle.Render(fmt.Sprintf("⚠ Found in %d pages (fix once in the component)", uv.PageCount)) + "\n\n")
+		}
+
 		if v.DocumentationURL != "" {
-			content.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("242")).Width(contentWidth-6).Render("Learn more: "+v.DocumentationURL))
+			content.WriteString(mutedStyle.Width(contentWidth-6).Render("Learn more: "+v.DocumentationURL))
 		}
 
 		style := violationStyle.Width(contentWidth)

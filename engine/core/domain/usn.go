@@ -25,6 +25,11 @@ const (
 	// Groups
 	RoleFieldset SemanticRole = "fieldset"
 	RoleLegend   SemanticRole = "legend"
+	RoleList     SemanticRole = "list"
+	RoleListItem SemanticRole = "listitem"
+	RoleTabList  SemanticRole = "tablist"
+	RoleTab      SemanticRole = "tab"
+	RoleTabPanel SemanticRole = "tabpanel"
 )
 
 // Platform represents the source framework or operating system.

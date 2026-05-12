@@ -19,10 +19,7 @@ func (r *ruleWCAG1411) Execute(ctx context.Context, analysisCtx *AnalysisContext
 		if node.Role == RoleInput {
 			borderColor, hasBorder := node.Traits["border-color"].(string)
 			bg, hasBg := node.Traits["background-color"].(string)
-			if !hasBg {
-				bg = "#ffffff"
-			}
-			if hasBorder {
+			if hasBorder && hasBg {
 				ratio := CalculateContrast(borderColor, bg)
 				if ratio < 3.0 {
 					violations = append(violations, Violation{
@@ -34,6 +31,15 @@ func (r *ruleWCAG1411) Execute(ctx context.Context, analysisCtx *AnalysisContext
 						DocumentationURL: r.DocumentationURL(),
 					})
 				}
+			} else if hasBorder && !hasBg {
+				violations = append(violations, Violation{
+					ErrorCode:        "WCAG_1_4_11_UNRESOLVED",
+					Severity:         SeverityWarning,
+					Message:          "Input border contrast could not be validated: background-color is not statically resolvable.",
+					SourceRef:        node.Source,
+					FixSnippet:       "Provide the resolved background color via --css or ensure it is defined in static CSS/Tailwind classes.",
+					DocumentationURL: r.DocumentationURL(),
+				})
 			}
 		}
 	}

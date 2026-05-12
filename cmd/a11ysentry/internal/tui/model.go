@@ -96,7 +96,7 @@ func (i treeItem) Title() string {
 		name = name + " [opaque]"
 	}
 
-	// Apply styles based on violations
+	// Apply styles based on violations from this specific file
 	style := lipgloss.NewStyle()
 	if i.report.ID != 0 || len(i.report.Violations) > 0 {
 		hasError, hasWarning := false, false
@@ -396,14 +396,22 @@ func (m *MainModel) flattenTree(node *domain.FileNode, report domain.ViolationRe
 	return items
 }
 
+// reportsForRun returns all reports belonging to the given RunID.
+func reportsForRun(allReports []domain.ViolationReport, runID string) []domain.ViolationReport {
+	var result []domain.ViolationReport
+	for _, r := range allReports {
+		if r.RunID == runID {
+			result = append(result, r)
+		}
+	}
+	return result
+}
+
 func (m *MainModel) updateProjectsList() {
 	type runStats struct {
 		runID     string
 		timestamp int64
 		count     int
-		errors    int
-		warnings  int
-		reports   []domain.ViolationReport
 	}
 	
 	// Map project name -> latest run
@@ -420,35 +428,38 @@ func (m *MainModel) updateProjectsList() {
 			latestRuns[name] = &runStats{
 				runID:     r.RunID,
 				timestamp: r.Timestamp,
-				reports:   []domain.ViolationReport{r},
+				count:     1,
 			}
 			run = latestRuns[name]
 		} else if r.RunID == run.runID {
-			run.reports = append(run.reports, r)
+			run.count++
 		} else {
 			// Older run, ignore for the main project list
 			continue
 		}
-
-		run.count++
-		for _, v := range r.Violations {
-			switch v.Severity {
-			case "error":
-				run.errors++
-			case "warning":
-				run.warnings++
-			}
-		}
+		_ = run // used below via latestRuns
 	}
 
+	// Now compute deduplicated error/warning counts per project using cross-tree dedup
 	var items []list.Item
-	// Sort by timestamp or name if needed, here we just iterate
 	for name, run := range latestRuns {
+		runReports := reportsForRun(m.allReports, run.runID)
+		unique := domain.DeduplicateCrossTree(runReports)
+
+		errors, warnings := 0, 0
+		for _, uv := range unique {
+			if uv.Violation.Severity == domain.SeverityError {
+				errors++
+			} else {
+				warnings++
+			}
+		}
+
 		items = append(items, projectItem{
 			name:     name,
 			count:    run.count,
-			errors:   run.errors,
-			warnings: run.warnings,
+			errors:   errors,
+			warnings: warnings,
 		})
 	}
 	m.projectsList.SetItems(items)

@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"fmt"
 	"sync"
 )
 
@@ -71,7 +72,7 @@ func deduplicateViolations(violations []Violation) []Violation {
 	seen := make(map[string]bool)
 	unique := violations[:0]
 	for _, v := range violations {
-		key := v.ErrorCode + "|" + v.SourceRef.RawHTML
+		key := fmt.Sprintf("%s|%s|%d|%d", v.ErrorCode, v.SourceRef.FilePath, v.SourceRef.Line, v.SourceRef.Column)
 		if !seen[key] {
 			seen[key] = true
 			unique = append(unique, v)
@@ -88,8 +89,11 @@ func getDefaultRules() []Rule {
 		&ruleWCAG141{},
 		&ruleWCAG143{},
 		&ruleWCAG1411{},
+		&ruleWCAG211{},
 		&ruleWCAG244{},
 		&ruleWCAG246{},
+		&ruleWCAG311{},
+		&ruleWCAG131ARIA{},
 		&ruleAccessibleNames{},
 		&ruleParsing{},
 		&ruleLandmarks{},

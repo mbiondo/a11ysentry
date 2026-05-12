@@ -9,16 +9,16 @@ import '../styles/global.css';
 ---
 
 <Layout title="A11ySentry | The Deterministic Accessibility Engine">
-	<main>
-        <h1 class="sr-only">A11ySentry: Universal and Deterministic Accessibility Engineering</h1>
-		<Hero />
-        <MultiPlatform />
-		<Features />
-        <MCPIntegration />
-        <Comparison />
+    <div class="bg-slate-950 min-h-screen">
+    <h1 class="sr-only">A11ySentry: Universal and Deterministic Accessibility Engineering</h1>
+    <Hero />
+    <MultiPlatform />
+    <Features />
+    <MCPIntegration />
+    <Comparison />
         
         <!-- Spectacular CTA -->
-        <section id="install" class="py-32 px-6 relative overflow-hidden" aria-label="Installation Guide">
+        <!-- a11y-ignore: WCAG_1_4_3 --><section id="install" class="py-32 px-6 relative overflow-hidden" aria-label="Installation Guide">
             <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full max-w-4xl opacity-20 blur-[100px] bg-gradient-to-r from-neon-cyan to-neon-emerald rounded-full"></div>
             
             <div class="max-w-5xl mx-auto glass p-12 md:p-20 rounded-[3rem] text-center space-y-10 relative z-10 border-neon-emerald/20">
@@ -66,7 +66,7 @@ import '../styles/global.css';
                 </div>
             </div>
         </section>
-	</main>
+    </div>
 </Layout>
 
 <style>

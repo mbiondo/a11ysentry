@@ -5,6 +5,17 @@ All notable changes to A11ySentry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-05-12
+
+### Fixed
+- **False Positives - `WCAG_3_1_1` (Lang)**: Now correctly scoped to known document root files (`layout.tsx`, `index.html`, etc.). Component partials and page files no longer trigger lang violations.
+- **False Positives - `WCAG_3_3_2` (Spread Props)**: Fixed JSX spread props detection (`{...props}`) not working due to `lines` parameter always being `nil`. Multi-line element spread detection added.
+- **False Positives - `WCAG_3_3_2` / `WCAG_4_1_2` (Opaque Components)**: Inputs and buttons with unresolved source position (`1:1`) are now skipped — they come from opaque library components (shadcn, Radix) whose labels are internal.
+- **Lint**: Resolved 3 `golangci-lint` issues (ineffectual assignment, unused struct fields).
+
+### Changed
+- **Vet & Lint Cleanup**: `go vet` and `golangci-lint` now pass with zero issues across all modules.
+
 ## [0.0.10] - 2026-05-04
 
 ### Fixed

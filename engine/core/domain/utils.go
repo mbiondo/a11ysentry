@@ -7,7 +7,13 @@ import (
 )
 
 // CalculateContrast returns the contrast ratio between two hex colors.
+// Returns -1 if either color is empty or invalid (cannot be parsed as 6-digit hex).
 func CalculateContrast(fg, bg string) float64 {
+	fgHex := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(fg)), "#")
+	bgHex := strings.TrimPrefix(strings.ToLower(strings.TrimSpace(bg)), "#")
+	if len(fgHex) != 6 || len(bgHex) != 6 {
+		return -1
+	}
 	l1 := GetLuminance(fg)
 	l2 := GetLuminance(bg)
 	if l1 < l2 {

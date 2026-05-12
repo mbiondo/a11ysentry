@@ -174,3 +174,125 @@ func TestHTMLAdapter_OpaqueNode(t *testing.T) {
 		t.Errorf("expected OpaqueSource '@mui/material/MuiButton', got %s", opaqueNode.Source.OpaqueSource)
 	}
 }
+
+func TestHTMLAdapter_ThemeBlock(t *testing.T) {
+	// GIVEN a CSS file using @theme (Tailwind CSS v4 / Astro convention)
+	cssContent := `@theme {
+  --color-neon-cyan: #22d3ee;
+  --color-brand-primary: #6366f1;
+}
+`
+	cssFile, _ := os.CreateTemp("", "test_theme_*.css")
+	defer func() { _ = os.Remove(cssFile.Name()) }()
+	_ = os.WriteFile(cssFile.Name(), []byte(cssContent), 0644)
+
+	htmlContent := `<!DOCTYPE html>
+<html><body>
+  <a id="link1" class="text-neon-cyan bg-brand-primary">Hello</a>
+  <a id="link2" class="text-neon-cyan/50">Faded</a>
+</body></html>`
+	htmlFile, _ := os.CreateTemp("", "test_theme_*.html")
+	defer func() { _ = os.Remove(htmlFile.Name()) }()
+	_ = os.WriteFile(htmlFile.Name(), []byte(htmlContent), 0644)
+
+	adapter := NewHTMLAdapter()
+	LoadProjectCSS(adapter, []string{cssFile.Name()})
+
+	nodes, err := adapter.Ingest(context.Background(), &domain.FileNode{FilePath: htmlFile.Name()})
+	if err != nil {
+		t.Fatalf("Ingest failed: %v", err)
+	}
+
+	var link1, link2 *domain.USN
+	for i := range nodes {
+		switch nodes[i].UID {
+		case "link1":
+			link1 = &nodes[i]
+		case "link2":
+			link2 = &nodes[i]
+		}
+	}
+
+	if link1 == nil {
+		t.Fatal("link1 not found")
+	}
+	if link1.Traits["color"] != "#22d3ee" {
+		t.Errorf("expected text-neon-cyan → #22d3ee, got %v", link1.Traits["color"])
+	}
+	if link1.Traits["background-color"] != "#6366f1" {
+		t.Errorf("expected bg-brand-primary → #6366f1, got %v", link1.Traits["background-color"])
+	}
+
+	if link2 == nil {
+		t.Fatal("link2 not found")
+	}
+	// text-neon-cyan/50 → 50% opacity blended over white (#ffffff default)
+	if link2.Traits["color"] == "" || link2.Traits["color"] == "#22d3ee" {
+		t.Errorf("expected opacity-blended color for text-neon-cyan/50, got %v", link2.Traits["color"])
+	}
+}
+
+func TestHTMLAdapter_ArbitraryValues(t *testing.T) {
+	// GIVEN a page using Tailwind JIT arbitrary color values
+	htmlContent := `<!DOCTYPE html>
+<html><body>
+  <a id="link1" class="bg-[#1a1b26] text-[#a9b1d6]">Dark BG</a>
+  <a id="link2" class="bg-[rgb(26,27,38)] text-[#ffffff]">RGB BG</a>
+</body></html>`
+	htmlFile, _ := os.CreateTemp("", "test_arbitrary_*.html")
+	defer func() { _ = os.Remove(htmlFile.Name()) }()
+	_ = os.WriteFile(htmlFile.Name(), []byte(htmlContent), 0644)
+
+	adapter := NewHTMLAdapter()
+	nodes, err := adapter.Ingest(context.Background(), &domain.FileNode{FilePath: htmlFile.Name()})
+	if err != nil {
+		t.Fatalf("Ingest failed: %v", err)
+	}
+
+	var link1, link2 *domain.USN
+	for i := range nodes {
+		switch nodes[i].UID {
+		case "link1":
+			link1 = &nodes[i]
+		case "link2":
+			link2 = &nodes[i]
+		}
+	}
+
+	if link1 == nil {
+		t.Fatal("link1 not found")
+	}
+	if link1.Traits["background-color"] != "#1a1b26" {
+		t.Errorf("bg-[#1a1b26] → expected #1a1b26, got %v", link1.Traits["background-color"])
+	}
+	if link1.Traits["color"] != "#a9b1d6" {
+		t.Errorf("text-[#a9b1d6] → expected #a9b1d6, got %v", link1.Traits["color"])
+	}
+
+	if link2 == nil {
+		t.Fatal("link2 not found")
+	}
+	if link2.Traits["background-color"] != "#1a1b26" {
+		t.Errorf("bg-[rgb(26,27,38)] → expected #1a1b26, got %v", link2.Traits["background-color"])
+	}
+}
+
+func TestHTMLAdapter_NormalizeHSL(t *testing.T) {
+	a := &htmlAdapter{}
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"hsl(0, 100%, 50%)", "#ff0000"},
+		{"hsl(120, 100%, 50%)", "#00ff00"},
+		{"hsl(240, 100%, 50%)", "#0000ff"},
+		{"hsla(0, 0%, 100%, 1)", "#ffffff"},
+		{"hsla(0, 0%, 0%, 1)", "#000000"},
+	}
+	for _, c := range cases {
+		got := a.normalizeColor(c.input)
+		if got != c.want {
+			t.Errorf("normalizeColor(%q) = %q, want %q", c.input, got, c.want)
+		}
+	}
+}

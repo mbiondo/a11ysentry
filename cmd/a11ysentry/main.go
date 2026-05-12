@@ -63,7 +63,7 @@ import (
 )
 
 var (
-	Version    = "0.1.0"
+	Version    = "0.1.1"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 
@@ -565,32 +565,117 @@ func printReports(reports []domain.ViolationReport, format, projectRoot, outputF
 		return
 	}
 
-	// Text mode logic
+	// Text mode: deduplicate cross-tree before rendering
+	unique := domain.DeduplicateCrossTree(reports)
+
 	var b strings.Builder
-	for _, r := range reports {
-		if len(r.Violations) > 0 || showTree {
-			fmt.Fprintf(&b, "\nPage: %s\n", shortPath(r.FilePath, projectRoot))
-			if showTree && r.Hierarchy != nil {
+	totalErrors, totalWarnings := 0, 0
+	for _, uv := range unique {
+		if uv.Violation.Severity == domain.SeverityError {
+			totalErrors++
+		} else {
+			totalWarnings++
+		}
+	}
+
+	// Group unique violations by source file for a clean component-centric view
+	type fileGroup struct {
+		filePath   string
+		violations []domain.UniqueViolation
+	}
+	groupOrder := []string{}
+	groups := map[string]*fileGroup{}
+	for _, uv := range unique {
+		fp := uv.Violation.SourceRef.FilePath
+		if fp == "" {
+			fp = "(unknown)"
+		}
+		if _, ok := groups[fp]; !ok {
+			groups[fp] = &fileGroup{filePath: fp}
+			groupOrder = append(groupOrder, fp)
+		}
+		groups[fp].violations = append(groups[fp].violations, uv)
+	}
+
+	for _, fp := range groupOrder {
+		g := groups[fp]
+		rel := shortPath(g.filePath, projectRoot)
+		fmt.Fprintf(&b, "\nFile: %s\n", rel)
+
+		// Build a slice of plain Violation for ToESLintStyle, then annotate with page count
+		var plain []domain.Violation
+		pageCounts := map[string]int{}
+		for _, uv := range g.violations {
+			plain = append(plain, uv.Violation)
+			if uv.PageCount > 1 {
+				key := fmt.Sprintf("%s|%d|%d", uv.Violation.ErrorCode, uv.Violation.SourceRef.Line, uv.Violation.SourceRef.Column)
+				pageCounts[key] = uv.PageCount
+			}
+		}
+
+		eslint := domain.ToESLintStyle(plain, projectRoot)
+
+		// Annotate lines that appear in multiple pages
+		if len(pageCounts) > 0 {
+			lines := strings.Split(eslint, "\n")
+			for i, line := range lines {
+				for key, count := range pageCounts {
+					parts := strings.SplitN(key, "|", 3)
+					if len(parts) == 3 && strings.Contains(line, parts[0]) {
+						lines[i] = line + fmt.Sprintf("  (found in %d pages)", count)
+						break
+					}
+				}
+			}
+			eslint = strings.Join(lines, "\n")
+		}
+
+		b.WriteString(eslint)
+	}
+
+	// Also render page trees if requested (kept for --show-tree compatibility)
+	if showTree {
+		for _, r := range reports {
+			if r.Hierarchy != nil {
+				fmt.Fprintf(&b, "\nPage tree: %s\n", shortPath(r.FilePath, projectRoot))
 				b.WriteString(printTree(r.Hierarchy, 1))
 				b.WriteString("\n")
-			}
-			if len(r.Violations) > 0 {
-				b.WriteString(domain.ToESLintStyle(r.Violations, projectRoot))
-			} else {
-				b.WriteString("  No violations found.\n")
 			}
 		}
 	}
 
+	// Score: start at 100, deduct 10 per error and 3 per warning, min 0
+	score := 100 - (totalErrors * 10) - (totalWarnings * 3)
+	if score < 0 {
+		score = 0
+	}
+	var scoreLabel string
+	switch {
+	case score >= 90:
+		scoreLabel = "A"
+	case score >= 75:
+		scoreLabel = "B"
+	case score >= 50:
+		scoreLabel = "C"
+	case score >= 25:
+		scoreLabel = "D"
+	default:
+		scoreLabel = "F"
+	}
+	summary := fmt.Sprintf("\n%s\nSummary: %d error(s), %d warning(s) | Score: %d/100 (%s)\n",
+		strings.Repeat("=", 60), totalErrors, totalWarnings, score, scoreLabel)
+
 	if outputFilePath != "" {
 		header := fmt.Sprintf("A11ySentry Analysis Report - %s\n", time.Now().Format(time.RFC1123))
 		separator := strings.Repeat("=", 60) + "\n\n"
-		final := header + separator + b.String()
+		final := header + separator + b.String() + summary
 		if err := os.WriteFile(outputFilePath, []byte(final), 0644); err != nil {
 			fmt.Fprintf(os.Stderr, "Error writing results to %s: %v\n", outputFilePath, err)
 		}
+		fmt.Print(summary)
 	} else {
 		fmt.Print(b.String())
+		fmt.Print(summary)
 	}
 }
 
