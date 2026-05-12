@@ -65,10 +65,11 @@ func (a *accessibilityAnalyzer) Analyze(ctx context.Context, nodes []USN, cfg Pr
 
 	wg.Wait()
 
-	return deduplicateViolations(allViolations), nil
+	return DeduplicateViolations(allViolations), nil
 }
 
-func deduplicateViolations(violations []Violation) []Violation {
+// DeduplicateViolations removes duplicate violations based on ErrorCode, FilePath, Line, and Column.
+func DeduplicateViolations(violations []Violation) []Violation {
 	seen := make(map[string]bool)
 	unique := violations[:0]
 	for _, v := range violations {

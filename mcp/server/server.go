@@ -58,7 +58,7 @@ func Start(repo ports.Repository) {
 	// Create MCP server
 	s := mcpserver.NewMCPServer(
 		"A11ySentry MCP Server",
-		"0.1.1",
+		"0.1.2",
 		mcpserver.WithLogging(),
 	)
 
@@ -199,7 +199,8 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 		return mcp.NewToolResultText("✅ No violations found."), nil
 	}
 
-	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
+	uniqueViolations := domain.DeduplicateViolations(allViolations)
+	return mcp.NewToolResultText(domain.ToTOON(uniqueViolations)), nil
 }
 
 func (srv *MCPServer) analyzeFiles(ctx context.Context, paths []string, originalInput string) (*mcp.CallToolResult, error) {
@@ -287,7 +288,8 @@ func (srv *MCPServer) analyzeFiles(ctx context.Context, paths []string, original
 		return mcp.NewToolResultText("✅ No violations found."), nil
 	}
 
-	return mcp.NewToolResultText(domain.ToTOON(allViolations)), nil
+	uniqueViolations := domain.DeduplicateViolations(allViolations)
+	return mcp.NewToolResultText(domain.ToTOON(uniqueViolations)), nil
 }
 
 func (srv *MCPServer) contextHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
