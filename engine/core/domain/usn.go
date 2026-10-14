@@ -23,6 +23,7 @@ const (
 	RoleSearch  SemanticRole = "search"
 
 	// Groups
+	RoleGeneric  SemanticRole = "generic"
 	RoleFieldset SemanticRole = "fieldset"
 	RoleLegend   SemanticRole = "legend"
 	RoleList     SemanticRole = "list"

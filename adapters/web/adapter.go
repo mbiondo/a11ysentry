@@ -77,10 +77,19 @@ func (a *htmlAdapter) Ingest(ctx context.Context, root *domain.FileNode) ([]doma
 	if root == nil {
 		return nil, nil
 	}
-	return a.ingestRecursive(ctx, root, "", "", false, nil)
+	return a.ingestRecursive(ctx, root, "", "", nil, make(map[string]bool))
 }
 
-func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string, inheritedHidden bool, inheritedIgnored []string) ([]domain.USN, error) {
+// ingestRecursive processes one file of the component graph.
+//
+// Imported components are separate documents: an aria-hidden element in the importing file is not
+// an ancestor of an imported component's markup, so hidden state is deliberately NOT propagated
+// across this boundary. Within a single file, traverse propagates it correctly down the DOM.
+//
+// ingested guards against the component graph converging: the same file is reachable through
+// several parents (a layout and its page both importing a shared component). Reading it once per
+// path would emit its nodes once per path, so a single hardcoded id would look duplicated.
+func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode, inheritedBG, inheritedFG string, inheritedIgnored []string, ingested map[string]bool) ([]domain.USN, error) {
 	if node.IsCycle {
 		// Stop processing cycles to avoid redundant work and errors.
 		return nil, nil
@@ -89,6 +98,10 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 		// Opaque nodes don't have source code to analyze.
 		return nil, nil
 	}
+	if ingested[node.FilePath] {
+		return nil, nil
+	}
+	ingested[node.FilePath] = true
 	data, err := os.ReadFile(node.FilePath)
 	if err != nil {
 		return nil, err
@@ -130,11 +143,10 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 	}
 
 	contentLines := strings.Split(cleanContent, "\n")
-	nodes := a.traverse(doc, node.FilePath, contentLines, cleanContent, isComponent, inheritedBG, inheritedFG, inheritedHidden, inheritedIgnored, opaqueMap)
+	nodes := a.traverse(doc, node.FilePath, contentLines, cleanContent, isComponent, inheritedBG, inheritedFG, false, inheritedIgnored, opaqueMap)
 
 	childBG := inheritedBG
 	childFG := inheritedFG
-	childHidden := inheritedHidden
 	childIgnored := inheritedIgnored
 	for _, n := range nodes {
 		if bg, ok := n.Traits["background-color"].(string); ok && bg != "" {
@@ -143,9 +155,6 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 		if fg, ok := n.Traits["color"].(string); ok && fg != "" {
 			childFG = fg
 		}
-		if h, ok := n.Traits["aria-hidden"].(string); ok && h == "true" {
-			childHidden = true
-		}
 		childIgnored = n.Source.IgnoredRules
 	}
 
@@ -153,7 +162,7 @@ func (a *htmlAdapter) ingestRecursive(ctx context.Context, node *domain.FileNode
 	allNodes = append(allNodes, nodes...)
 
 	for _, child := range node.Children {
-		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG, childHidden, childIgnored)
+		childNodes, err := a.ingestRecursive(ctx, child, childBG, childFG, childIgnored, ingested)
 		if err != nil {
 			return nil, err
 		}
@@ -389,6 +398,21 @@ func (a *htmlAdapter) traverse(n *html.Node, filename string, lines []string, fu
 				IgnoredRules: allIgnored,
 			},
 		}
+
+		// Record the element's tag name. UID holds the id attribute when the element has one, so
+		// the tag is the only reliable source for rules that need the element type (e.g. heading
+		// level). Without this, <h1 id="main-title"> is invisible to the page-level H1 check.
+		if n.Type == html.ElementNode && n.Data != "" {
+			usn.Traits["tag"] = strings.ToLower(n.Data)
+		}
+
+		// Not every <header>, <footer>, <section> or <form> is a landmark. Per HTML-AAM:
+		//   - <header>/<footer> only map to banner/contentinfo outside sectioning content,
+		//   - <section> only maps to region when it has an accessible name,
+		//   - <form> only maps to form when it has an accessible name.
+		// Treating them as landmarks unconditionally made ARIA_1_1 demand labels for nested
+		// page-furniture elements that are not landmarks at all.
+		a.demoteNonLandmarks(n, &usn)
 
 		if inheritedHidden {
 			usn.Traits["aria-hidden-inherited"] = true
@@ -646,6 +670,44 @@ func (a *htmlAdapter) processInlineStyles(n *html.Node, usn *domain.USN) {
 			}
 		}
 	}
+}
+
+// demoteNonLandmarks clears the landmark role from elements HTML-AAM does not expose as
+// landmarks, so landmark rules stop demanding labels for ordinary page furniture.
+//
+// A nested <header>/<footer> is not banner/contentinfo, and a <section>/<form> without an
+// accessible name is not a region/form landmark.
+func (a *htmlAdapter) demoteNonLandmarks(n *html.Node, usn *domain.USN) {
+	if n.Type != html.ElementNode {
+		return
+	}
+
+	switch strings.ToLower(n.Data) {
+	case "header", "footer":
+		if isInsideSectioningContent(n) {
+			usn.Role = domain.RoleGeneric
+		}
+	case "section", "form":
+		if usn.Label == "" {
+			usn.Role = domain.RoleGeneric
+		}
+	}
+}
+
+// isInsideSectioningContent reports whether the node has an ancestor establishing sectioning
+// content. Per HTML-AAM those ancestors stop <header>/<footer> from mapping to the banner and
+// contentinfo landmarks.
+func isInsideSectioningContent(n *html.Node) bool {
+	for p := n.Parent; p != nil; p = p.Parent {
+		if p.Type != html.ElementNode {
+			continue
+		}
+		switch strings.ToLower(p.Data) {
+		case "article", "aside", "main", "nav", "section":
+			return true
+		}
+	}
+	return false
 }
 
 func (a *htmlAdapter) mapRole(tag string) domain.SemanticRole {
