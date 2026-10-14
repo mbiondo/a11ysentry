@@ -63,7 +63,7 @@ import (
 )
 
 var (
-	Version    = "0.2.1"
+	Version    = "0.3.0"
 	titleStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true)
 )
 

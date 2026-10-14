@@ -58,7 +58,7 @@ func Start(repo ports.Repository) {
 	// Create MCP server
 	s := mcpserver.NewMCPServer(
 		"A11ySentry MCP Server",
-		"0.2.1",
+		"0.3.0",
 		mcpserver.WithLogging(),
 	)
 
