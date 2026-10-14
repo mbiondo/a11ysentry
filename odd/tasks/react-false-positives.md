@@ -170,5 +170,9 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
 - **L23** (open item, 2026-10-14): the scoped recheck of the L14 corrections was covered by the test
   suite rather than by a fresh verifier run, so T9 is recorded as done on test evidence, not on a
   second independent pass.
-- **Status**: implementation, correction and measurement complete; 13 commits on the branch; S8
+- **L24** (user decision, 2026-10-14, verbatim): "aun no lo estan usando casi, lo uso solo yo, asi
+  que no seria problemas" — the S8 JSON body change (`[]ViolationReport` -> `[]UniqueViolation`) is
+  accepted as-is, closing advisory A1 from L22. The CHANGELOG keeps its breaking-change note because
+  it stays technically accurate for anyone else who starts consuming the output.
+- **Status**: implementation, correction and measurement complete; 14 commits on the branch; S8
   verified with no blockers.
