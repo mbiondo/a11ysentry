@@ -8,6 +8,7 @@ description: >
   Mobile (Android, iOS, Flutter, React Native), Desktop (.NET, Electron, PyQt), and backend
   templates (Django, Flask, Angular, Vue).
 version: "2.0.0"
+allowed-tools: [analyze_accessibility, get_component_context, get_audit_history]
 ---
 
 # A11ySentry Accessibility Expert
@@ -115,7 +116,7 @@ a11ysentry Button.tsx Modal.astro   # analyze one or more files
 a11ysentry --dir ./src              # analyze a project, resolving component trees
 a11ysentry --exclude node_modules   # comma-separated directories to skip
 a11ysentry --css global.css, tokens.css   # pre-load external CSS for color resolution
-a11ysentry --format json            # text (default) | json | json-ld | sarif
+a11ysentry --format json            # text (default) | json | sarif
 a11ysentry --output results.txt      # write results to a file
 a11ysentry --watch                  # re-analyze on file changes
 a11ysentry --show-tree              # print the resolved component tree

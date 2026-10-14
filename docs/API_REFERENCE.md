@@ -222,8 +222,8 @@ a11ysentry file.html
 # JSON
 a11ysentry --format json file.html
 
-# JSON-LD
-a11ysentry --format json-ld file.html
+# SARIF 2.1.0 (GitHub Code Scanning)
+a11ysentry --format sarif file.html
 ```
 
 ### TUI Dashboard

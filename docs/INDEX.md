@@ -70,7 +70,7 @@ a11ysentry --format json file.html
 | **[MCP Integration Guide](./MCP_INTEGRATION.md)** | AI agent setup and tools | AI Agent Users |
 | **[CLI Commands](./API_REFERENCE.md#cli-commands)** | Command-line usage | All Users |
 | **[TUI Dashboard](./API_REFERENCE.md#tui-dashboard)** | Interactive dashboard | All Users |
-| [**Output Formats**](./API_REFERENCE.md#output-formats) | Text, JSON, JSON-LD | CI/CD Engineers |
+| [**Output Formats**](./API_REFERENCE.md#output-formats) | Text, JSON, SARIF | CI/CD Engineers |
 
 **AI Agent Integration:**
 - [Supported Agents](./MCP_INTEGRATION.md#supported-ai-agents)

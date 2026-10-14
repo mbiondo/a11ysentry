@@ -12,7 +12,7 @@ A11ySentry integrates with AI agents via the **Model Context Protocol (MCP)**, a
 |-------|----------|-----------------|
 | **Claude Desktop** | macOS, Windows | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)<br>`%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
 | **Claude Code** | All | `~/.claude.json` |
-| **Cursor** | macOS, Windows, Linux | `~/.cursor/mcp.json` |
+| **Cursor** | macOS, Windows, Linux | `%APPDATA%\Cursor\User\globalStorage\mcp-servers.json` (Windows)<br>`~/Library/Application Support/Cursor/User/globalStorage/mcp-servers.json` (macOS) |
 | **VS Code** | All | `.vscode/mcp.json` or user settings |
 | **Gemini CLI** | All | `~/.gemini/settings.json` |
 | **Qwen** | All | `~/.qwen/settings.json` |
@@ -233,7 +233,6 @@ a11ysentry --css global.css,tokens.css Component.vue
 # Output formats
 a11ysentry --format text    # default — human-readable
 a11ysentry --format json    # machine-readable JSON
-a11ysentry --format json-ld # JSON-LD with schema.org context
 a11ysentry --format sarif   # SARIF 2.1.0 (GitHub Code Scanning)
 
 # Watch mode — re-analyze on file changes
