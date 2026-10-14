@@ -53,8 +53,9 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
 | T6 | S5 | inline | done | `aria-hidden` no longer crosses inter-file boundaries |
 | T7 | S6 | inline | done | one ingestion per file per analysis |
 | T8 | S4 | inline | done | nameless `form`/`section` and nested `header`/`footer` are not landmarks |
-| T9 | S1-S7 | delegated | pending | independent verifier over the whole feature |
+| T9 | S1-S7 | delegated | done | verifier L13: 6/7 specs; 1 blocker (S7) and 2 regressions, all corrected in L14 and covered by tests |
 | T10 | S8 | inline | done | `printReports` deduplicates cross-tree for text, json and sarif; RED first (`json: got 3 entries for 1 distinct problem`) |
+| T11 | S8 | delegated | done | verifier over `b10098a`: no blockers, S8 met |
 
 ## Log
 
@@ -157,4 +158,17 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   keeps the information the old per-page repetition carried, as `pageCount`. RED observed first
   (`json: got 3 entries for 1 distinct problem`), GREEN after. On the reporting backoffice all three
   formats now agree: 40 entries, 24 errors / 16 warnings, `pageCount` summing to the previous 58.
-- **Status**: implementation, correction and measurement complete; 11 commits on the branch.
+- **L22** (independent verification of S8, 2026-10-14): a verifier over `b10098a` returned **no
+  blockers**. It reproduced the RED exactly, confirmed text/json/sarif agree on the distinct count,
+  that `pageCount` sums to the old per-tree total, that SARIF keeps its rules and results consistent
+  with the unique list, that no in-repo consumer parses the old JSON shape, and that the MCP claim in
+  the commit message is correct. Its regression probes were committed as
+  `cmd/a11ysentry/s8_formats_test.go` and `mcp/server/s8_crosstree_test.go`. Advisories, none a
+  defect: `PageCount` counts occurrences rather than trees, so its comment is loose; empty SARIF emits
+  `results: null` (baseline behaviour); the web adapter reports only the first missing-alt image per
+  file (baseline behaviour); and the S8 JSON body is a breaking change for external consumers.
+- **L23** (open item, 2026-10-14): the scoped recheck of the L14 corrections was covered by the test
+  suite rather than by a fresh verifier run, so T9 is recorded as done on test evidence, not on a
+  second independent pass.
+- **Status**: implementation, correction and measurement complete; 13 commits on the branch; S8
+  verified with no blockers.
