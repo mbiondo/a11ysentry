@@ -161,7 +161,7 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 			log.Printf("Error scanning project root %s: %v", root, err)
 			continue
 		}
-		uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude)
+		uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude, root)
 
 		importGraph := scanner.BuildImportGraph(uiFiles, fw, root)
 		trees := fw.BuildPageTrees(uiFiles, importGraph, root)

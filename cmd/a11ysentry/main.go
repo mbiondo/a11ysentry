@@ -295,7 +295,7 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 		return
 	}
-	uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude)
+	uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude, absDir)
 	if len(uiFiles) == 0 {
 		if cfg.Format == "text" {
 			fmt.Printf("  No supported UI files found — skipping.\n\n")
@@ -1074,7 +1074,7 @@ func runLinterMode(cfg domain.ProjectConfig, repo ports.Repository) {
 	if err != nil {
 		log.Fatalf("Linter init error: %v", err)
 	}
-	uiFiles = scanner.FilterExcluded(uiFiles, linterCfg.Exclude)
+	uiFiles = scanner.FilterExcluded(uiFiles, linterCfg.Exclude, absRoot)
 
 	importGraph := scanner.BuildImportGraph(uiFiles, fw, absRoot)
 	trees := fw.BuildPageTrees(uiFiles, importGraph, absRoot)

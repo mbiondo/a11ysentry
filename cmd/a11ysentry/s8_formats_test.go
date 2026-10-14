@@ -92,13 +92,23 @@ func TestS8AllFormatsAgreeOnDistinctCount(t *testing.T) {
 }
 
 // S8 edge case: an empty report list must still produce valid, empty output for every format.
+// A scan with no violations must emit `results` as an empty array: GitHub Code Scanning rejects
+// `"results": null` as invalid SARIF ("is not of a type(s) array").
 func TestS8EmptyReportList(t *testing.T) {
 	if got := renderS8(t, nil, "json"); got != "[]" {
 		t.Errorf("empty json = %q, want []", got)
 	}
+
+	rawSARIF := renderS8(t, nil, "sarif")
+	if strings.Contains(rawSARIF, `"results": null`) {
+		t.Errorf("empty sarif emitted results as null; Code Scanning rejects that:\n%s", rawSARIF)
+	}
 	var log sarif.Log
-	if err := json.Unmarshal([]byte(renderS8(t, nil, "sarif")), &log); err != nil {
+	if err := json.Unmarshal([]byte(rawSARIF), &log); err != nil {
 		t.Fatalf("empty sarif is not valid SARIF: %v", err)
+	}
+	if log.Runs[0].Results == nil {
+		t.Errorf("empty sarif results must be an empty array, not null:\n%s", rawSARIF)
 	}
 	if len(log.Runs[0].Results) != 0 || len(log.Runs[0].Tool.Driver.Rules) != 0 {
 		t.Errorf("empty sarif should carry no results and no rules")

@@ -38,6 +38,14 @@ Verbatim report (thread from the UPCEFE orchestrator agent, 2026-10-14):
   raw per-tree reports. Text mode already collapsed them. Fixing it also changes the JSON body,
   which becomes the cross-tree unique list and carries `pageCount`.
 
+- **S9 — An `exclude` entry must be matched inside the project, not against the absolute path.**
+  Found while investigating a red CI on this branch: this repository's own `a11ysentry.json`
+  excludes `landing`, and `FilterExcluded` compared every entry against every segment of the
+  absolute path, so `<checkout>/landing/...` matched and `--dir landing` analyzed nothing.
+- **S10 — SARIF must stay valid when a scan finds nothing.** `FromReports` declared `var results
+  []Result`, so a clean scan emitted `"results": null` and GitHub Code Scanning rejected the upload
+  (`is not of a type(s) array`). Latent until S9 left the repository's own scan empty.
+
 Scope decision (user, 2026-10-14): phases 1 and 2 — fix the five reported symptoms plus S7. Making
 the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explicitly out of scope.
 
@@ -56,6 +64,8 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
 | T9 | S1-S7 | delegated | done | verifier L13: 6/7 specs; 1 blocker (S7) and 2 regressions, all corrected in L14 and covered by tests |
 | T10 | S8 | inline | done | `printReports` deduplicates cross-tree for text, json and sarif; RED first (`json: got 3 entries for 1 distinct problem`) |
 | T11 | S8 | delegated | done | verifier over `b10098a`: no blockers, S8 met |
+| T12 | S9 | inline | done | `FilterExcluded` matches the path relative to the root; `--dir landing` back to 7 files |
+| T13 | S10 | inline | done | `results` initialized to an empty slice; a clean scan emits `[]` |
 
 ## Log
 
@@ -178,5 +188,20 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   `analyzeFiles` handler does not apply `exclude` (unlike `analyzeDirectory`, `server.go:164`) stays
   as-is. Passing an explicit file path is a direct order, so filtering it by `exclude` would be
   surprising. Recorded rather than changed.
-- **Status**: implementation, correction and measurement complete; 15 commits on the branch; S8
-  verified with no blockers.
+- **L26** (regression found, 2026-10-14): the Accessibility Audit job went red on this branch while
+  it passed on `main`. Measured with the workflow's own command (`./a11ysentry --format sarif .`)
+  against the released v0.2.0 binary: baseline emitted `results: array[41]`, `rules: 12`; the branch
+  emitted `results: null`, `rules: 0`. `--dir landing` fell from 7 analyzed files to "No supported UI
+  files found", and `--dir examples` from 58 to 0. Both symptoms came from S7's `FilterExcluded`
+  matching the absolute path.
+- **L27** (fix, 2026-10-14): `FilterExcluded` now takes the project root and matches the path
+  relative to it, so an exclude still removes `src/generated` at any depth, but a directory name
+  above the project no longer acts as a global exclude. `FromReports` initializes `results` to an
+  empty slice. RED observed first for both (`not enough arguments in call to FilterExcluded` and
+  `empty sarif emitted results as null`), GREEN after. `--dir landing` is back to 7 files,
+  `--dir examples` to 58, and the workflow command now emits `results: array[0]`.
+- **L28** (open, 2026-10-14): the repository's own `a11ysentry.json` excludes `landing` and
+  `examples`, the only projects with UI, so the accessibility job discovers zero roots and audits
+  nothing. User decision (verbatim): "no pasa nada con el job" — the workflow is left as-is and the
+  job now passes on a valid, empty SARIF.
+- **Status**: implementation, correction and measurement complete; 17 commits on the branch.

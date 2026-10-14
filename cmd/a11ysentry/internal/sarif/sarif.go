@@ -78,7 +78,9 @@ type Region struct {
 func FromReports(reports []domain.ViolationReport) Log {
 	// Collect unique rules across all reports.
 	ruleMap := make(map[string]Rule)
-	var results []Result
+	// Initialize to an empty slice: a nil slice marshals to null, and GitHub Code Scanning rejects
+	// a SARIF log whose runs[0].results is not an array when the scan is clean.
+	results := make([]Result, 0)
 
 	for _, rep := range reports {
 		for _, v := range rep.Violations {

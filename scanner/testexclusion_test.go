@@ -64,7 +64,7 @@ func TestFilterExcluded(t *testing.T) {
 		"/app/node_modules/pkg/index.tsx",
 	}
 
-	got := FilterExcluded(files, []string{"examples", "landing", "node_modules"})
+	got := FilterExcluded(files, []string{"examples", "landing", "node_modules"}, "/app")
 
 	want := []string{"/app/src/Button.tsx"}
 	if len(got) != len(want) {
@@ -80,7 +80,7 @@ func TestFilterExcluded(t *testing.T) {
 func TestFilterExcludedIsNoOpWithoutExcludes(t *testing.T) {
 	files := []string{"/app/src/Button.tsx", "/app/examples/Demo.tsx"}
 
-	got := FilterExcluded(files, nil)
+	got := FilterExcluded(files, nil, "/app")
 	if len(got) != len(files) {
 		t.Errorf("FilterExcluded() with no excludes dropped files: %v", got)
 	}

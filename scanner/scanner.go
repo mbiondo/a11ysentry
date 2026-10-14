@@ -76,11 +76,16 @@ var testDirs = map[string]bool{
 
 // FilterExcluded drops files that live inside an excluded directory.
 //
-// Exclude entries are matched against every path segment, so "examples" removes any file under an
-// examples directory at any depth. Project discovery applies excludes while walking, but that walk
-// stops as soon as it finds a project root, so files inside an already-discovered root were never
-// filtered — which is why the configured exclude had no effect on a single-project directory.
-func FilterExcluded(files []string, excludes []string) []string {
+// Exclude entries are matched against every path segment of the file's path *inside the project*,
+// so "examples" removes any file under an examples directory at any depth. Project discovery
+// applies excludes while walking, but that walk stops as soon as it finds a project root, so files
+// inside an already-discovered root were never filtered — which is why the configured exclude had
+// no effect on a single-project directory.
+//
+// The comparison is relative to root on purpose. Matching the absolute path let a directory name
+// anywhere above the project act as a global exclude: this repository excludes "landing", so every
+// file under <checkout>/landing matched it and pointing at that project with --dir found nothing.
+func FilterExcluded(files []string, excludes []string, root string) []string {
 	if len(files) == 0 || len(excludes) == 0 {
 		return files
 	}
@@ -97,11 +102,24 @@ func FilterExcluded(files []string, excludes []string) []string {
 
 	kept := make([]string, 0, len(files))
 	for _, f := range files {
-		if !hasExcludedSegment(strings.ToLower(filepath.ToSlash(f)), excluded) {
+		if !hasExcludedSegment(relativePath(root, f), excluded) {
 			kept = append(kept, f)
 		}
 	}
 	return kept
+}
+
+// relativePath returns file relative to root, so an exclude is matched only against the path inside
+// the project. A file outside root keeps its own path.
+func relativePath(root, file string) string {
+	if root == "" {
+		return filepath.ToSlash(file)
+	}
+	rel, err := filepath.Rel(root, file)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return filepath.ToSlash(file)
+	}
+	return filepath.ToSlash(rel)
 }
 
 func hasExcludedSegment(slashPath string, excluded map[string]bool) bool {
