@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Installer**: `install.sh` read the skill from a directory belonging to an unrelated project, so Unix installs never received the skill. Both installers now delegate to the binary's embedded skill.
 - **CLI**: An unknown `--format` value printed nothing and exited `0`; it now reports an error. The unimplemented `json-ld` format was removed from the help text and documentation.
 - **Docs**: Corrected the MCP guide (the server exposes three tools, not one), the Cursor config path, and the build instructions — the repository has no root module, so a `go.work` workspace is required and tests run per module.
+- **Landing**: Corrected the version badge, added Pi to the supported agents, documented the third MCP tool, and fixed bold text that rendered as literal asterisks.
 
 ## [0.1.2] - 2026-05-12
 
