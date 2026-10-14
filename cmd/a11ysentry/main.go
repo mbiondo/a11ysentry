@@ -759,10 +759,18 @@ func shortPath(path, root string) string {
 func handleMCPSubcommand(args []string) {
 	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
 	registerFlag := mcpFlags.Bool("register", false, "Register A11ySentry in AI Agents (Claude, Cursor, etc.)")
+	registerAllFlag := mcpFlags.Bool("register-all", false, "Register A11ySentry in every detected AI agent (non-interactive)")
 	installSkillsFlag := mcpFlags.Bool("install-skills", false, "Install the A11ySentry agent skill into every known agent runtime (non-interactive)")
 	binaryPath := mcpFlags.String("path", "", "Path to the a11ysentry binary (defaults to current executable)")
 	if err := mcpFlags.Parse(args); err != nil {
 		log.Fatal(err)
+	}
+
+	if *registerFlag || *registerAllFlag {
+		if *binaryPath == "" {
+			exe, _ := os.Executable()
+			*binaryPath = exe
+		}
 	}
 
 	if *installSkillsFlag {
@@ -773,12 +781,21 @@ func handleMCPSubcommand(args []string) {
 		return
 	}
 
-	if *registerFlag {
-		if *binaryPath == "" {
-			exe, _ := os.Executable()
-			*binaryPath = exe
+	if *registerAllFlag {
+		registered, errs := registration.RegisterDetected(*binaryPath)
+		for _, label := range registered {
+			fmt.Printf("  [✓] Registered in %s\n", label)
 		}
+		for _, err := range errs {
+			fmt.Printf("  [!] %v\n", err)
+		}
+		if len(registered) == 0 {
+			fmt.Println("No supported AI agents detected on this machine.")
+		}
+		return
+	}
 
+	if *registerFlag {
 		p := tea.NewProgram(tui.MultiSelectModel{
 			Title: "Register A11ySentry in AI Agents",
 			Choices: []tui.Choice{
@@ -1217,6 +1234,7 @@ func printUsage() {
 	fmt.Println("  a11ysentry --platform vue         Force platform (react, vue, svelte, angular, astro, android, ios, ...)")
 	fmt.Println("  a11ysentry mcp                   Start MCP server")
 	fmt.Println("  a11ysentry mcp --register        Register the MCP server in detected AI agents")
+	fmt.Println("  a11ysentry mcp --register-all    Register the MCP server in every detected agent")
 	fmt.Println("  a11ysentry mcp --install-skills  Install the agent skill into every known runtime")
 	fmt.Println("  a11ysentry --version, -v          Show version")
 }

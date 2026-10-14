@@ -178,3 +178,80 @@ func mustSkillBytes(t *testing.T) []byte {
 	}
 	return data
 }
+
+func TestDetectedAgentsSkipsAbsentRuntimes(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+
+	// Nothing installed: no runtime should be detected, so no configuration gets created for an
+	// agent the user does not have.
+	if got := DetectedAgents(); len(got) != 0 {
+		labels := make([]string, 0, len(got))
+		for _, a := range got {
+			labels = append(labels, a.Label)
+		}
+		t.Fatalf("DetectedAgents() = %v, want none for an empty home", labels)
+	}
+}
+
+func TestDetectedAgentsFindsPi(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+
+	piDir := filepath.Join(home, ".pi", "agent")
+	if err := os.MkdirAll(piDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	agents := DetectedAgents()
+
+	var sawPi bool
+	for _, a := range agents {
+		if a.Label == "Pi" {
+			sawPi = true
+		}
+	}
+
+	if !sawPi {
+		t.Fatalf("DetectedAgents() did not find Pi with %s present; got %d agents", piDir, len(agents))
+	}
+}
+
+func TestRegisterDetectedRegistersOnlyPresentRuntimes(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	t.Setenv("APPDATA", filepath.Join(home, "AppData", "Roaming"))
+
+	if err := os.MkdirAll(filepath.Join(home, ".pi", "agent"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	registered, errs := RegisterDetected("a11ysentry")
+	if len(errs) != 0 {
+		t.Fatalf("RegisterDetected() errors = %v", errs)
+	}
+	if len(registered) != 1 || registered[0] != "Pi" {
+		t.Fatalf("registered = %v, want exactly [Pi]", registered)
+	}
+
+	// Pi must have been written, and no other runtime's config may have been created.
+	raw := readFile(t, piMCPConfigPath(home))
+	var cfg MCPConfig
+	if err := json.Unmarshal([]byte(raw), &cfg); err != nil {
+		t.Fatalf("invalid JSON written for Pi: %v", err)
+	}
+	if _, ok := cfg.MCPServers["a11ysentry"]; !ok {
+		t.Errorf("a11ysentry missing from the Pi config: %s", raw)
+	}
+
+	for _, other := range []string{".qwen", ".gemini", ".config/opencode"} {
+		if _, err := os.Stat(filepath.Join(home, other)); err == nil {
+			t.Errorf("RegisterDetected created config for an absent runtime: %s", other)
+		}
+	}
+}

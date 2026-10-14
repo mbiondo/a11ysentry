@@ -68,6 +68,11 @@ a11ysentry init --skip-actions    # skip GitHub Actions workflow
 # Register the MCP server in the agents you select (interactive)
 a11ysentry mcp --register
 
+# Register the MCP server in every agent already installed on this machine (non-interactive).
+# Only runtimes that are actually present are touched, so no configuration is created for an
+# agent you do not have.
+a11ysentry mcp --register-all
+
 # Install the agent skill into every known agent runtime (non-interactive).
 # The skill is embedded in the binary, so no checkout is needed.
 a11ysentry mcp --install-skills

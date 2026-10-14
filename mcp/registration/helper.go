@@ -222,6 +222,84 @@ func registerPiAt(home, binaryPath string) error {
 	return patchConfig(piMCPConfigPath(home), binaryPath)
 }
 
+// AgentRegistration pairs a user-facing label with the function that registers A11ySentry in that
+// agent runtime.
+type AgentRegistration struct {
+	Label    string
+	Register func(binaryPath string) error
+}
+
+// agentProbe is an AgentRegistration plus the paths that show the runtime is installed.
+type agentProbe struct {
+	label   string
+	markers []string
+	reg     func(string) error
+}
+
+// DetectedAgents returns the agent runtimes present on this machine, in menu order.
+//
+// Registration skips a runtime whose configuration directory does not exist, so installing
+// A11ySentry never leaves configuration behind for an agent the user does not have.
+func DetectedAgents() []AgentRegistration {
+	home, _ := os.UserHomeDir()
+
+	probes := agentProbes(home)
+
+	var detected []AgentRegistration
+	for _, p := range probes {
+		for _, marker := range p.markers {
+			if _, err := os.Stat(marker); err == nil {
+				detected = append(detected, AgentRegistration{Label: p.label, Register: p.reg})
+				break
+			}
+		}
+	}
+	return detected
+}
+
+// agentProbes lists every supported runtime with the markers that reveal it. The markers mirror
+// the config locations the Register* functions write to.
+func agentProbes(home string) []agentProbe {
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		return []agentProbe{
+			{"Claude Desktop", []string{filepath.Join(appData, "Claude")}, RegisterClaude},
+			{"Claude Code (CLI)", []string{filepath.Join(home, ".claude.json")}, RegisterClaudeCode},
+			{"Cursor IDE", []string{filepath.Join(appData, "Cursor")}, RegisterCursor},
+			{"VSCode (Cline/Roo-Code)", []string{filepath.Join(appData, "Code")}, RegisterVSCode},
+			{"Gemini CLI", []string{filepath.Join(appData, "gemini"), filepath.Join(home, ".gemini")}, RegisterGemini},
+			{"Qwen", []string{filepath.Join(home, ".qwen")}, RegisterQwen},
+			{"OpenCode", []string{filepath.Join(home, ".config", "opencode")}, RegisterOpenCode},
+			{"Pi", []string{filepath.Join(home, ".pi", "agent")}, RegisterPi},
+		}
+	}
+
+	return []agentProbe{
+		{"Claude Desktop", []string{filepath.Join(home, "Library", "Application Support", "Claude")}, RegisterClaude},
+		{"Claude Code (CLI)", []string{filepath.Join(home, ".claude.json")}, RegisterClaudeCode},
+		{"Cursor IDE", []string{filepath.Join(home, "Library", "Application Support", "Cursor"), filepath.Join(home, ".config", "Cursor")}, RegisterCursor},
+		{"VSCode (Cline/Roo-Code)", []string{filepath.Join(home, "Library", "Application Support", "Code"), filepath.Join(home, ".config", "Code")}, RegisterVSCode},
+		{"Gemini CLI", []string{filepath.Join(home, ".gemini")}, RegisterGemini},
+		{"Qwen", []string{filepath.Join(home, ".qwen")}, RegisterQwen},
+		{"OpenCode", []string{filepath.Join(home, ".config", "opencode")}, RegisterOpenCode},
+		{"Pi", []string{filepath.Join(home, ".pi", "agent")}, RegisterPi},
+	}
+}
+
+// RegisterDetected registers A11ySentry in every agent runtime present on this machine. It
+// returns the labels it registered in, and one error per runtime that failed, so a single
+// failure does not stop the others.
+func RegisterDetected(binaryPath string) (registered []string, errs []error) {
+	for _, agent := range DetectedAgents() {
+		if err := agent.Register(binaryPath); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", agent.Label, err))
+			continue
+		}
+		registered = append(registered, agent.Label)
+	}
+	return registered, errs
+}
+
 // GlobalSkillTargets returns every global skills directory A11ySentry installs into, covering
 // the pi runtime, the cross-runtime agents convention, Gemini CLI, and OpenCode.
 func GlobalSkillTargets(home string) []SkillTarget {

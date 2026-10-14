@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Pi Agent Support**: `a11ysentry mcp --register` now registers the MCP server in the `pi` agent runtime (`~/.pi/agent/mcp.json`), and a new non-interactive `a11ysentry mcp --install-skills` installs the agent skill into every known runtime's skills directory.
+- **Non-interactive registration**: `a11ysentry mcp --register-all` registers the MCP server in every agent already installed on the machine, so installations no longer depend on the interactive menu. Runtimes that are not present are skipped, so no configuration is created for an agent you do not have.
 - **Agent Skill Coverage**: The skill now documents the real tool surface — all three MCP tools, the CLI, output formats, exit codes, the `a11y-ignore` system, the USN model, and `a11ysentry.json`.
 
 ### Changed
