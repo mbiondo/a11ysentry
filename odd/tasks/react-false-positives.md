@@ -204,4 +204,5 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   `examples`, the only projects with UI, so the accessibility job discovers zero roots and audits
   nothing. User decision (verbatim): "no pasa nada con el job" — the workflow is left as-is and the
   job now passes on a valid, empty SARIF.
-- **Status**: implementation, correction and measurement complete; 17 commits on the branch.
+- **Status**: implementation, correction and measurement complete; S8, S9 and S10 fixed and verified
+  against the released v0.2.0 binary.
