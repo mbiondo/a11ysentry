@@ -122,3 +122,23 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   `REDUNDANT_TITLE` 4->2, `WCAG_2_4_1` 3->1), consistent with the ingestion guard removing duplicated
   component instances.
 - **Status**: implementation and correction complete; delivery (push, PR, merge) is the user's decision.
+- **L16** (dead code, 2026-10-14): deleted `refactor.go`, a 394-line orphan that declared `package
+  main` at the repository root where there is no Go module, so nothing ever compiled or imported it.
+  It held a stale copy of the web adapter including a second `aria-hidden-inherited` setter.
+- **L17** (root cause, 2026-10-14): `scanner/resolve.go` probed `.tsx`/`.jsx` twice — they are listed
+  in both `UIExtensions` and the follow-up extension list — and `add()` appended without deduplicating,
+  so every component edge in the graph was recorded twice. Fixed by correcting the probe and guarding
+  `add()`; verified RED first (`Widget.tsx resolved 2 times`). This is the cause the ingestion guard
+  had only masked.
+- **L18** (major finding, 2026-10-14): the Next.js `Probe` only checked a root `app/` directory, so a
+  project using `src/app/` failed detection and fell through to the generic scanner. On the reporting
+  backoffice that produced 69 page trees instead of 13 and made every orphan component and layout its
+  own "page" — which is why `G141` fired on `header.tsx`, `breadcrumb.tsx`, `alert-dialog.tsx` and
+  `layout.tsx`. After the fix the deduplicated report went from **287 violations to 40 (-86%)** and
+  `G141` reached zero.
+- **L19** (measurement correction, 2026-10-14): the earlier JSON-based numbers were inflated. `printReports`
+  applies `DeduplicateCrossTree` only in text mode (`main.go:573`); `--format json` serializes the raw
+  per-tree reports, so violations from a layout shared by 13 pages appear once per page. The MCP path
+  (`server.go:207,296`) also uses the intra-tree `DeduplicateViolations` rather than the cross-tree one,
+  so it does not collapse shared-component duplicates either. Text-mode totals are the trustworthy ones.
+- **Status**: implementation, correction and measurement complete; 9 commits on the branch.
