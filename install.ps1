@@ -103,8 +103,8 @@ if ($UserPath -notlike "*$InstallDir*") {
 Write-Host "Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
 $BinaryFull = Join-Path $InstallDir $BinaryName
 if (Test-Path $BinaryFull) {
-    # Register the MCP server in the agents the user selects.
-    & $BinaryFull mcp --register
+    # Register the MCP server in every agent already installed on this machine.
+    & $BinaryFull mcp --register-all
 
     # Install the agent skill into every known runtime. The binary carries the skill embedded,
     # so this works without a repository checkout.

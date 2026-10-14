@@ -97,8 +97,8 @@ fi
 echo -e "\033[0;36m⚙️  Detecting AI Agents and registering MCP...\033[0m"
 BINARY_FULL="$INSTALL_DIR/$BINARY_NAME"
 if [ -f "$BINARY_FULL" ]; then
-    # Register the MCP server in the agents the user selects.
-    "$BINARY_FULL" mcp --register
+    # Register the MCP server in every agent already installed on this machine.
+    "$BINARY_FULL" mcp --register-all
 
     # Install the agent skill into every known runtime. The binary carries the skill embedded,
     # so this works without a repository checkout.
