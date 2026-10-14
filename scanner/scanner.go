@@ -8,6 +8,7 @@ import (
 	"a11ysentry/engine/core/domain"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -48,6 +49,106 @@ var SkipDirs = map[string]bool{
 	".next":        true,
 	".astro":       true,
 	"vendor":       true,
+}
+
+// testFilePatterns match filenames that hold tests rather than rendered UI. Auditing them
+// produces false positives: they contain fixtures and assertions, not the markup a user sees.
+//
+// Each pattern is anchored so ordinary words are not mistaken for tests: a file called
+// "latest.ts" or "Contest.tsx" merely contains the substring "test." and must still be audited.
+var testFilePatterns = []*regexp.Regexp{
+	// foo.test.ts, foo.spec.tsx, foo.test.vue — requires a dot before the marker.
+	regexp.MustCompile(`(?i)\.(test|spec)\.[a-z0-9]+$`),
+	// test_foo.py
+	regexp.MustCompile(`(?i)^test_[^/\\]+\.py$`),
+	// foo_test.py, foo_test.dart, foo_test.go
+	regexp.MustCompile(`(?i)_test\.[a-z0-9]+$`),
+	// FooTests.swift, FooTest.kt, FooTests.cs — CamelCase suffix, language-anchored.
+	regexp.MustCompile(`(?i)tests?\.(swift|kt|cs)$`),
+}
+
+// testDirs are directory names whose contents are never audited.
+var testDirs = map[string]bool{
+	"__tests__": true,
+	"__mocks__": true,
+	"__snapshots__": true,
+}
+
+// FilterExcluded drops files that live inside an excluded directory.
+//
+// Exclude entries are matched against every path segment of the file's path *inside the project*,
+// so "examples" removes any file under an examples directory at any depth. Project discovery
+// applies excludes while walking, but that walk stops as soon as it finds a project root, so files
+// inside an already-discovered root were never filtered — which is why the configured exclude had
+// no effect on a single-project directory.
+//
+// The comparison is relative to root on purpose. Matching the absolute path let a directory name
+// anywhere above the project act as a global exclude: this repository excludes "landing", so every
+// file under <checkout>/landing matched it and pointing at that project with --dir found nothing.
+func FilterExcluded(files []string, excludes []string, root string) []string {
+	if len(files) == 0 || len(excludes) == 0 {
+		return files
+	}
+
+	excluded := make(map[string]bool, len(excludes))
+	for _, e := range excludes {
+		if e = strings.TrimSpace(e); e != "" {
+			excluded[strings.ToLower(filepath.ToSlash(e))] = true
+		}
+	}
+	if len(excluded) == 0 {
+		return files
+	}
+
+	kept := make([]string, 0, len(files))
+	for _, f := range files {
+		if !hasExcludedSegment(relativePath(root, f), excluded) {
+			kept = append(kept, f)
+		}
+	}
+	return kept
+}
+
+// relativePath returns file relative to root, so an exclude is matched only against the path inside
+// the project. A file outside root keeps its own path.
+func relativePath(root, file string) string {
+	if root == "" {
+		return filepath.ToSlash(file)
+	}
+	rel, err := filepath.Rel(root, file)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return filepath.ToSlash(file)
+	}
+	return filepath.ToSlash(rel)
+}
+
+func hasExcludedSegment(slashPath string, excluded map[string]bool) bool {
+	for _, segment := range strings.Split(slashPath, "/") {
+		if excluded[segment] {
+			return true
+		}
+	}
+	return false
+}
+
+// IsTestFile reports whether path is a test, spec, mock, or snapshot file. Test files are
+// excluded from collection by default so they never become analysis roots.
+func IsTestFile(path string) bool {
+	slash := filepath.ToSlash(path)
+
+	for _, dir := range strings.Split(slash, "/") {
+		if testDirs[strings.ToLower(dir)] {
+			return true
+		}
+	}
+
+	base := filepath.Base(slash)
+	for _, pattern := range testFilePatterns {
+		if pattern.MatchString(base) {
+			return true
+		}
+	}
+	return false
 }
 
 // isProjectRoot returns true if dir contains any of the known project markers.

@@ -42,7 +42,7 @@ func (r *ruleLandmarks) Execute(ctx context.Context, analysisCtx *AnalysisContex
 				sameRoleCount++
 			}
 		}
-		if sameRoleCount > 1 && node.Label == "" && node.Role != RoleMain {
+		if sameRoleCount > 1 && !nodeHasAccessibleName(node) && node.Role != RoleMain {
 			violations = append(violations, Violation{
 				ErrorCode:        "ARIA_1_1",
 				Severity:         SeverityWarning,

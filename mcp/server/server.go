@@ -124,7 +124,11 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Could not resolve directory: %v", err)), nil
 	}
 
-	roots := scanner.FindProjectRoots(absDir)
+	// Honor the project's exclude configuration, matching the CLI (cmd/a11ysentry/main.go).
+	// Without this the MCP path silently ignored a11ysentry.json and analyzed directories the
+	// user had explicitly excluded.
+	projectCfg, _ := domain.LoadConfig(filepath.Join(absDir, "a11ysentry.json"))
+	roots := scanner.FindProjectRoots(absDir, projectCfg.Exclude...)
 	if len(roots) == 0 {
 		return mcp.NewToolResultError(fmt.Sprintf("No supported project roots found in %s", absDir)), nil
 	}
@@ -150,16 +154,17 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 			generic.New(),
 		)
 
+		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
+
 		uiFiles, cssFiles, err := fw.CollectFiles(root)
 		if err != nil {
 			log.Printf("Error scanning project root %s: %v", root, err)
 			continue
 		}
+		uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude, root)
 
 		importGraph := scanner.BuildImportGraph(uiFiles, fw, root)
 		trees := fw.BuildPageTrees(uiFiles, importGraph, root)
-
-		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
 
 		for _, tree := range trees {
 			adapter, platform := getAdapterAndPlatform(tree.Root.FilePath, fw.Name())

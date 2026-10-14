@@ -5,6 +5,16 @@ All notable changes to A11ySentry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **CLI JSON output**: `--format json` now emits the cross-tree unique violation list instead of the raw per-tree reports, so a component shared by many pages is reported once. The repetition the old shape carried is preserved as `pageCount`.
+
+### Fixed
+- **CLI**: `--format json` and `--format sarif` repeated a violation once for every page tree that contained it — on a real Next.js app, 58 entries for 40 distinct problems. Both formats now deduplicate the way text mode already did.
+- **Scanner**: `exclude` entries were matched against a file's absolute path, so a directory name anywhere above the project acted as a global exclude. This repository's own `a11ysentry.json` excludes `landing`, which made `--dir landing` analyze nothing. Excludes are now matched against the path inside the project, so `src/generated` is still excluded but the checkout's own folder name is not.
+- **SARIF**: a scan that found no violations emitted `"results": null`, which GitHub Code Scanning rejects as invalid SARIF (`is not of a type(s) array`). A clean scan now emits `"results": []`.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added
