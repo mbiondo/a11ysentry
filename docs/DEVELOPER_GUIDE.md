@@ -45,16 +45,40 @@ semantix/
 
 ### Build & Run
 
-```bash
-# Build CLI (from workspace root)
-go build -o cmd/a11ysentry/a11ysentry ./cmd/a11ysentry
+This repository has **no root Go module**. Each component — `cmd/a11ysentry`, `engine`, `mcp`,
+`scanner`, and every `adapters/*` — is its own module. Local imports only resolve through a
+`go.work` workspace file, which is **not committed** (it is in `.gitignore`). Create it once after
+cloning:
 
-# Run tests
-go test ./...
+```bash
+# From the repository root. Add every module that has a go.mod.
+go work init .
+go work use ./cmd/a11ysentry ./engine ./mcp ./scanner \
+             ./adapters/android ./adapters/angular ./adapters/blazor ./adapters/django \
+             ./adapters/dotnet ./adapters/electron ./adapters/flask ./adapters/flutter \
+             ./adapters/godot ./adapters/ios ./adapters/javadesktop ./adapters/pyqt \
+             ./adapters/reactnative ./adapters/unity ./adapters/vue ./adapters/web
+```
+
+Then build and test:
+
+```bash
+# Build the CLI
+go build -o cmd/a11ysentry/a11ysentry.exe ./cmd/a11ysentry   # Windows
+go build -o cmd/a11ysentry/a11ysentry ./cmd/a11ysentry       # Unix
+
+# Test. Run per module: a bare `go test ./...` from the root fails, because the root is not a
+# module and the workspace does not make it one.
+go -C engine test ./...
+go -C mcp test ./...
+go -C adapters/web test ./...
 
 # Analyze a file
 ./cmd/a11ysentry/a11ysentry ../examples/example-astro/src/pages/index.astro
 ```
+
+If `go build` reports that local `a11ysentry/...` packages "are not in std", the workspace is
+missing or incomplete — re-run `go work use` for the module you are building.
 
 ---
 
@@ -340,18 +364,20 @@ func TestFullPipeline_WebButton(t *testing.T) {
 
 ### Running Tests
 
+There is no root module, so run tests per module:
+
 ```bash
-# All tests
-go test ./...
+# All tests in one module
+go -C engine test ./...
 
 # With coverage
-go test -cover ./...
+go -C engine test -cover ./...
 
 # Specific package
-go test ./engine/core/domain
+go -C engine test ./core/domain
 
 # Verbose output
-go test -v ./...
+go -C mcp test -v ./...
 ```
 
 ---
@@ -718,4 +744,4 @@ usn := domain.USN{
 ### Compilación para desarrollo
 - Compilar el binario de desarrollo desde la raíz del repositorio: 
   go build -o cmd/a11ysentry/a11ysentry.exe ./cmd/a11ysentry
-- El workspace Go se resuelve mediante go.work; los módulos locales se resuelven automáticamente y no se necesita un cli separado.
+- El workspace Go se resuelve mediante go.work; los módulos locales se resuelven automáticamente y no se necesita un cli separado. Ver la sección "Build & Run" al inicio de esta guía para crearlo.

@@ -11,10 +11,13 @@ A11ySentry integrates with AI agents via the **Model Context Protocol (MCP)**, a
 | Agent | Platform | Config Location |
 |-------|----------|-----------------|
 | **Claude Desktop** | macOS, Windows | `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)<br>`%APPDATA%\Claude\claude_desktop_config.json` (Windows) |
+| **Claude Code** | All | `~/.claude.json` |
 | **Cursor** | macOS, Windows, Linux | `~/.cursor/mcp.json` |
 | **VS Code** | All | `.vscode/mcp.json` or user settings |
-| **Gemini CLI** | All | `~/.gemini/mcp.json` |
-| **OpenCode** | All | `~/.opencode/mcp.json` |
+| **Gemini CLI** | All | `~/.gemini/settings.json` |
+| **Qwen** | All | `~/.qwen/settings.json` |
+| **OpenCode** | All | `~/.config/opencode/opencode.json` |
+| **Pi** | All | `~/.pi/agent/mcp.json` |
 
 ---
 
@@ -59,15 +62,21 @@ a11ysentry init --skip-hooks      # skip pre-commit hook
 a11ysentry init --skip-actions    # skip GitHub Actions workflow
 ```
 
-### Step 3: Register MCP
+### Step 3: Register MCP and install the skill
 
 ```bash
-# Register in all detected agents automatically
+# Register the MCP server in the agents you select (interactive)
 a11ysentry mcp --register
 
-# Verify registration
-a11ysentry mcp --check-mcp
+# Install the agent skill into every known agent runtime (non-interactive).
+# The skill is embedded in the binary, so no checkout is needed.
+a11ysentry mcp --install-skills
 ```
+
+`--register` writes the MCP server entry (for example `~/.pi/agent/mcp.json` for Pi).
+`--install-skills` writes `a11ysentry-mcp/SKILL.md` into every known global skills directory —
+`~/.pi/agent/skills`, `~/.config/agents/skills`, `~/.agents/skills`, `~/.gemini/skills`, and
+`~/.config/opencode/skills` — so an agent knows how to use the tool, not just that it exists.
 
 ---
 
@@ -122,17 +131,22 @@ Edit `~/.opencode/mcp.json`:
 
 ## Available Tools
 
-The MCP server exposes **one tool**:
+The MCP server exposes **three tools**:
 
 ### `analyze_accessibility`
 
-Audits one or more source files for WCAG 2.2 accessibility violations.
+Audits one or more source files, or an entire project directory, for WCAG 2.2 accessibility
+violations.
 
 **Parameters:**
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `path` | string | ✅ | Path(s) to analyze. Comma-separate multiple files for component tree context. |
+| `path` | string | ✅ | A file path, a directory path, or comma-separated file paths for component tree context. |
+
+When `path` is a directory, A11ySentry discovers project roots, resolves the import graph, and
+builds full PageTrees before analyzing. This is the recommended mode for anything larger than a
+single component, because it produces context-aware results with far fewer false positives.
 
 **Example — single file:**
 
@@ -145,7 +159,18 @@ Audits one or more source files for WCAG 2.2 accessibility violations.
 }
 ```
 
-**Example — component tree (recommended):**
+**Example — whole project:**
+
+```json
+{
+  "name": "analyze_accessibility",
+  "arguments": {
+    "path": "src/"
+  }
+}
+```
+
+**Example — component tree (recommended for single files):**
 
 ```json
 {
@@ -156,31 +181,38 @@ Audits one or more source files for WCAG 2.2 accessibility violations.
 }
 ```
 
-**Response (violations found):**
+**Response (violations found):** TOON (Token-Oriented Object Notation), which keeps large result
+sets cheap on agent context.
 
-```json
-[
-  {
-    "ErrorCode": "WCAG_1_1_1",
-    "Severity": "error",
-    "Message": "Image missing alternative text. Every image must have an 'alt', 'aria-label', or platform-specific description attribute.",
-    "SourceRef": {
-      "FilePath": "src/components/Header.astro",
-      "Line": 12,
-      "Column": 5,
-      "RawHTML": "<img src=\"logo.svg\"/>"
-    },
-    "FixSnippet": "Add a descriptive label for users with screen readers.",
-    "DocumentationURL": "https://www.w3.org/WAI/WCAG22/Techniques/general/G94"
-  }
-]
+```text
+violations[1]{code,sev,file,line,snippet,msg,fix}:
+  WCAG_1_1_1,E,src/components/Header.astro,12,<img src="logo.svg"/>,Image missing alternative text,Add a descriptive label for users with screen readers.
 ```
+
+Commas inside `snippet`, `msg`, and `fix` are escaped to `;` so columns never shift.
 
 **Response (no violations):**
 
 ```
-✅ No accessibility violations found in src/components/Button.tsx.
+✅ No violations found.
 ```
+
+### `get_component_context`
+
+Returns the architectural hierarchy (ancestors and children) of a component, so a violation can be
+judged in the tree it renders in. Accepts absolute or repository-relative paths.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `path` | string | ✅ | Path to the component file to investigate. |
+
+### `get_audit_history`
+
+Returns the last N saved audit reports from the local database.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `limit` | number | ❌ | Maximum number of reports to retrieve. Default: 10. |
 
 ---
 
