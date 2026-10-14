@@ -124,7 +124,11 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 		return mcp.NewToolResultError(fmt.Sprintf("Could not resolve directory: %v", err)), nil
 	}
 
-	roots := scanner.FindProjectRoots(absDir)
+	// Honor the project's exclude configuration, matching the CLI (cmd/a11ysentry/main.go).
+	// Without this the MCP path silently ignored a11ysentry.json and analyzed directories the
+	// user had explicitly excluded.
+	projectCfg, _ := domain.LoadConfig(filepath.Join(absDir, "a11ysentry.json"))
+	roots := scanner.FindProjectRoots(absDir, projectCfg.Exclude...)
 	if len(roots) == 0 {
 		return mcp.NewToolResultError(fmt.Sprintf("No supported project roots found in %s", absDir)), nil
 	}

@@ -49,7 +49,7 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 		}
 
 		ext := strings.ToLower(filepath.Ext(path))
-		if scanner.UIExtensions[ext] {
+		if scanner.UIExtensions[ext] && !scanner.IsTestFile(path) {
 			uiFiles = append(uiFiles, path)
 		}
 		return nil

@@ -52,7 +52,7 @@ func (f *Framework) CollectFiles(dir string) ([]string, []string, error) {
 			cssFiles = append(cssFiles, path)
 			return nil
 		}
-		if scanner.UIExtensions[ext] {
+		if scanner.UIExtensions[ext] && !scanner.IsTestFile(path) {
 			uiFiles = append(uiFiles, path)
 		}
 		return nil

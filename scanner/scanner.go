@@ -8,6 +8,7 @@ import (
 	"a11ysentry/engine/core/domain"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 )
@@ -48,6 +49,49 @@ var SkipDirs = map[string]bool{
 	".next":        true,
 	".astro":       true,
 	"vendor":       true,
+}
+
+// testFilePatterns match filenames that hold tests rather than rendered UI. Auditing them
+// produces false positives: they contain fixtures and assertions, not the markup a user sees.
+//
+// Each pattern is anchored so ordinary words are not mistaken for tests: a file called
+// "latest.ts" or "Contest.tsx" merely contains the substring "test." and must still be audited.
+var testFilePatterns = []*regexp.Regexp{
+	// foo.test.ts, foo.spec.tsx, foo.test.vue — requires a dot before the marker.
+	regexp.MustCompile(`(?i)\.(test|spec)\.[a-z0-9]+$`),
+	// test_foo.py
+	regexp.MustCompile(`(?i)^test_[^/\\]+\.py$`),
+	// foo_test.py, foo_test.dart, foo_test.go
+	regexp.MustCompile(`(?i)_test\.[a-z0-9]+$`),
+	// FooTests.swift, FooTest.kt, FooTests.cs — CamelCase suffix, language-anchored.
+	regexp.MustCompile(`(?i)tests?\.(swift|kt|cs)$`),
+}
+
+// testDirs are directory names whose contents are never audited.
+var testDirs = map[string]bool{
+	"__tests__": true,
+	"__mocks__": true,
+	"__snapshots__": true,
+}
+
+// IsTestFile reports whether path is a test, spec, mock, or snapshot file. Test files are
+// excluded from collection by default so they never become analysis roots.
+func IsTestFile(path string) bool {
+	slash := filepath.ToSlash(path)
+
+	for _, dir := range strings.Split(slash, "/") {
+		if testDirs[strings.ToLower(dir)] {
+			return true
+		}
+	}
+
+	base := filepath.Base(slash)
+	for _, pattern := range testFilePatterns {
+		if pattern.MatchString(base) {
+			return true
+		}
+	}
+	return false
 }
 
 // isProjectRoot returns true if dir contains any of the known project markers.
