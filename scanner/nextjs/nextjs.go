@@ -46,7 +46,11 @@ func (f *Framework) Name() string { return "Next.js App Router" }
 // Probe returns true when dir contains a Next.js App Router project.
 // Heuristic: presence of app/ directory AND next.config.* at the root.
 func (f *Framework) Probe(dir string) bool {
-	hasAppDir := scanner.DirExists(filepath.Join(dir, "app"))
+	// Next.js supports both a root app/ directory and a src/app/ directory. Only checking the
+	// root one made a project laid out under src/ fall through to the generic scanner, losing the
+	// layout chain and analyzing every orphan component as if it were a page.
+	hasAppDir := scanner.DirExists(filepath.Join(dir, "app")) ||
+		scanner.DirExists(filepath.Join(dir, "src", "app"))
 	hasNextConfig := scanner.FileExists(filepath.Join(dir, "next.config.js")) ||
 		scanner.FileExists(filepath.Join(dir, "next.config.ts")) ||
 		scanner.FileExists(filepath.Join(dir, "next.config.mjs"))
