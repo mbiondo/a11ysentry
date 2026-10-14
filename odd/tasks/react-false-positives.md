@@ -102,3 +102,23 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   populated USN hierarchy that phase 3 defers. The deterministic cases (nested in
   `article`/`aside`/`main`/`nav`/`section` within the same file) are fixed.
 - **Next step**: independent verification of the whole feature against the branch point.
+- **L13** (independent verification, 2026-10-14): verifier returned **6 of 7 specs passing**. The five
+  reported false positives are genuinely removed and the true-positive output for img-alt,
+  heading-skip, contrast, `tabindex=-1` and two `<main>` is byte-identical to the baseline. It found
+  one blocker (S7: `FindProjectRoots` short-circuits at a project root, so excludes never applied) and
+  two regressions this change introduced (an `aria-labelledby`/`title`-named section or form was
+  demoted; `aria-labelledby` was not recorded in Traits so the landmark rule still demanded a label).
+  It also reported that `resolve.go` resolves `.tsx`/`.jsx` imports twice, duplicating every graph
+  edge — a pre-existing cause of double ingestion that the ingestion guard now masks.
+- **L14** (correction batch, 2026-10-14): added `scanner.FilterExcluded` and applied it in the MCP
+  server and both CLI paths, closing S7; made `aria-labelledby`/`title` count as an accessible name;
+  recorded `aria-labelledby` in Traits and shared one `nodeHasAccessibleName` notion between adapter
+  and rules; and moved both heading checks onto a single `headingLevel` helper.
+- **L15** (real-world measurement, 2026-10-14): ran the released v0.2.0 binary and then this branch
+  against `C:\Users\Maxim\Documents\repositories\UPCEFE\backoffice` (Next.js 16 / React 19, no
+  `a11ysentry.json`, so default excludes). Total violations **524 -> 42 (-92%)**. By rule:
+  `WCAG_4_1_1` 151->2, `WCAG_2_4_3_HIDDEN` 107->2, `WCAG_4_1_3` 94->1, `ARIA_1_1` 55->0, `G141` 54->4.
+  Rules that were not touched also dropped (`ADV_FOCUS_TRAP` 25->13, `MODAL_MISSING_LABEL` 25->13,
+  `REDUNDANT_TITLE` 4->2, `WCAG_2_4_1` 3->1), consistent with the ingestion guard removing duplicated
+  component instances.
+- **Status**: implementation and correction complete; delivery (push, PR, merge) is the user's decision.
