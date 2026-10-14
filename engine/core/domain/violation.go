@@ -45,8 +45,8 @@ type Analyzer interface {
 
 // UniqueViolation wraps a Violation with cross-tree deduplication metadata.
 type UniqueViolation struct {
-	Violation Violation
-	PageCount int // How many PageTrees contained this exact violation
+	Violation Violation `json:"violation"`
+	PageCount int       `json:"pageCount"` // How many PageTrees contained this exact violation
 }
 
 // violationKey returns a stable string key identifying a violation by rule + location.

@@ -32,6 +32,11 @@ Verbatim report (thread from the UPCEFE orchestrator agent, 2026-10-14):
 - **S7 — The MCP path must honor the project's `exclude` configuration.** Derived while tracing S1:
   the CLI passes configured excludes to project discovery, the MCP server does not, so
   `a11ysentry.json` `exclude` silently has no effect through MCP.
+- **S8 — Every output format must report a shared component once, not once per page.** Derived from
+  L19 while re-measuring: `--format json` emitted 58 entries for 40 distinct problems, and
+  `--format sarif` would post 58 Code Scanning alerts for the same 40, because both serialized the
+  raw per-tree reports. Text mode already collapsed them. Fixing it also changes the JSON body,
+  which becomes the cross-tree unique list and carries `pageCount`.
 
 Scope decision (user, 2026-10-14): phases 1 and 2 — fix the five reported symptoms plus S7. Making
 the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explicitly out of scope.
@@ -49,6 +54,7 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
 | T7 | S6 | inline | done | one ingestion per file per analysis |
 | T8 | S4 | inline | done | nameless `form`/`section` and nested `header`/`footer` are not landmarks |
 | T9 | S1-S7 | delegated | pending | independent verifier over the whole feature |
+| T10 | S8 | inline | done | `printReports` deduplicates cross-tree for text, json and sarif; RED first (`json: got 3 entries for 1 distinct problem`) |
 
 ## Log
 
@@ -138,7 +144,17 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   `G141` reached zero.
 - **L19** (measurement correction, 2026-10-14): the earlier JSON-based numbers were inflated. `printReports`
   applies `DeduplicateCrossTree` only in text mode (`main.go:573`); `--format json` serializes the raw
-  per-tree reports, so violations from a layout shared by 13 pages appear once per page. The MCP path
-  (`server.go:207,296`) also uses the intra-tree `DeduplicateViolations` rather than the cross-tree one,
-  so it does not collapse shared-component duplicates either. Text-mode totals are the trustworthy ones.
-- **Status**: implementation, correction and measurement complete; 9 commits on the branch.
+  per-tree reports, so violations from a layout shared by 13 pages appear once per page. Text-mode
+  totals are the trustworthy ones.
+- **L20** (correction, 2026-10-14): L19 also claimed the MCP path fails to collapse shared-component
+  duplicates. That was wrong. `DeduplicateViolations` keys on `ErrorCode|FilePath|Line|Column`, the
+  same key as `DeduplicateCrossTree`, and `analyzeDirectory`/`analyzeFiles` hand it the accumulated
+  list, so the MCP output was already cross-tree unique. Measured against the same project: the MCP
+  never produced the 58-entry inflation.
+- **L21** (fix, 2026-10-14): `printReports` now computes the cross-tree unique list once, before the
+  format switch, and renders it for text, json and sarif. SARIF derives its rules and results from
+  that list (`FromReports` only reads `Violations`), and JSON serializes `[]UniqueViolation`, which
+  keeps the information the old per-page repetition carried, as `pageCount`. RED observed first
+  (`json: got 3 entries for 1 distinct problem`), GREEN after. On the reporting backoffice all three
+  formats now agree: 40 entries, 24 errors / 16 warnings, `pageCount` summing to the previous 58.
+- **Status**: implementation, correction and measurement complete; 11 commits on the branch.
