@@ -95,3 +95,10 @@ Branch: `feat/pi-agent-support` · Delivery strategy: `single-pr` · Test runner
   scope: `mcp --register --install-skills` gives `--install-skills` precedence, and the tests for
   `engine/persistence/sqlite` rewrite a tracked `test_history.db`.
 - **Status**: all tasks complete. Delivery (push, PR, merge) is the user's decision.
+- **L14** (user decision, 2026-10-14): after the PR was open, reinstalling the binary exposed that
+  `mcp --register` is interactive only, so `install.ps1` could not complete in a non-interactive run.
+  User chose to add a non-interactive registration path. Added `mcp --register-all` plus
+  `DetectedAgents`/`RegisterDetected`, which skip runtimes that are not installed rather than
+  creating configuration for agents the user does not have. Both installers now use it. Verified in a
+  scratch profile containing only `.pi` and `.gemini`: it registered in exactly those two, preserved
+  the pre-existing `codegraph` entry, and created nothing for Qwen or OpenCode.
