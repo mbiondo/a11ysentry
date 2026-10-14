@@ -5,6 +5,22 @@ All notable changes to A11ySentry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-10-14
+
+### Added
+- **Pi Agent Support**: `a11ysentry mcp --register` now registers the MCP server in the `pi` agent runtime (`~/.pi/agent/mcp.json`), and a new non-interactive `a11ysentry mcp --install-skills` installs the agent skill into every known runtime's skills directory.
+- **Non-interactive registration**: `a11ysentry mcp --register-all` registers the MCP server in every agent already installed on the machine, so installations no longer depend on the interactive menu. Runtimes that are not present are skipped, so no configuration is created for an agent you do not have.
+- **Agent Skill Coverage**: The skill now documents the real tool surface — all three MCP tools, the CLI, output formats, exit codes, the `a11y-ignore` system, the USN model, and `a11ysentry.json`.
+
+### Changed
+- **Agent Skill Single Source**: The skill body now lives in exactly one file, embedded into the binary with `go:embed`, replacing four copies that had already drifted apart.
+
+### Fixed
+- **Installer**: `install.sh` read the skill from a directory belonging to an unrelated project, so Unix installs never received the skill. Both installers now delegate to the binary's embedded skill.
+- **CLI**: An unknown `--format` value printed nothing and exited `0`; it now reports an error. The unimplemented `json-ld` format was removed from the help text and documentation.
+- **Docs**: Corrected the MCP guide (the server exposes three tools, not one), the Cursor config path, and the build instructions — the repository has no root module, so a `go.work` workspace is required and tests run per module.
+- **Landing**: Corrected the version badge, added Pi to the supported agents, documented the third MCP tool, and fixed bold text that rendered as literal asterisks.
+
 ## [0.1.2] - 2026-05-12
 
 ### Fixed

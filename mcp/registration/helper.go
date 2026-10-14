@@ -1,12 +1,27 @@
 package registration
 
 import (
+	"embed"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"runtime"
 )
 
+// skillFS is the single source of truth for the agent-facing skill. It is embedded so the
+// compiled binary installs exactly the bytes that live in this repository, and so the two can
+// never drift apart again.
+//
+//go:embed skills/a11ysentry-mcp
+var skillFS embed.FS
+
+// skillRoot is the directory of the embedded skill tree.
+const skillRoot = "skills/a11ysentry-mcp"
+
+// MCPConfig is the union of the agent configuration shapes A11ySentry writes.
 type MCPConfig struct {
 	MCPServers map[string]MCPServerConfig `json:"mcpServers,omitempty"`
 	// OpenCode specific root key
@@ -25,78 +40,17 @@ type OpenCodeServerConfig struct {
 	Enabled bool     `json:"enabled"`
 }
 
-const a11ysentrySkillContent = `---
-name: a11ysentry-mcp
-description: >
-  Expert guidance for auditing and fixing accessibility violations using the A11ySentry MCP server.
-  Triggers: "check accessibility", "audit UI", "fix a11y", "WCAG compliance", or UI changes in PRs.
-allowed-tools: [analyze_accessibility, get_component_context, get_audit_history, read_file, glob, grep_search]
-version: "1.3.0"
----
+// SkillTarget is a directory an agent runtime scans for skills.
+type SkillTarget struct {
+	// Label names the runtime that reads the directory.
+	Label string
+	// Path is the skills directory to install into.
+	Path string
+}
 
-# A11ySentry Expert Skill
-
-You are an accessibility expert. Your goal is to ensure the project complies with WCAG 2.2 standards using the ` + "`" + `a11ysentry` + "`" + ` MCP tool.
-
-## 🧠 Strategic Instructions
-
-### 1. The Recursive Context Rule (CRITICAL)
-Accessibility context is often fragmented. An ` + "`" + `<input>` + "`" + ` in one file might be labeled by a ` + "`" + `<label>` + "`" + ` in a parent or sibling.
-- **NEVER** analyze a single component file in isolation if it belongs to a tree.
-- **ACTION**: Use ` + "`" + `grep_search` + "`" + ` or ` + "`" + `read_file` + "`" + ` to find where the component is used.
-- **ACTION**: Pass ALL related files to ` + "`" + `analyze_accessibility` + "`" + ` as a comma-separated list.
-
-### 2. Multi-Platform Awareness
-A11ySentry uses specific adapters. When you see these files, apply the corresponding mindset:
-- ` + "`" + `.astro` + "`" + `, ` + "`" + `.vue` + "`" + `, ` + "`" + `.svelte` + "`" + `, ` + "`" + `.tsx` + "`" + `: Web/HTML standards.
-- ` + "`" + `.kt` + "`" + `, ` + "`" + `.xml` + "`" + `: Android (Compose/Views).
-- ` + "`" + `.swift` + "`" + `: iOS (SwiftUI).
-- ` + "`" + `.dart` + "`" + `: Flutter.
-
-### 3. Fixing Protocol
-When violations are found:
-1. **Analyze**: Read the ` + "`" + `Message` + "`" + ` and ` + "`" + `ErrorCode` + "`" + ` (e.g., WCAG 1.1.1).
-2. **Consult**: Check the ` + "`" + `DocumentationURL` + "`" + ` if the fix isn't obvious.
-3. **Execute**: Use the ` + "`" + `FixSnippet` + "`" + ` as a base, but ensure it matches the project's styling/component patterns.
-4. **Verify**: ALWAYS re-run ` + "`" + `analyze_accessibility` + "`" + ` after making a change to confirm the fix.
-
-## 🛠 Available Tools (via MCP)
-
-- ` + "`" + `analyze_accessibility(path: string)` + "`" + `: Audits files or directories. ` + "`" + `path` + "`" + ` can be a single file path, a directory path, or a comma-separated list of files.
-  - **Directory Mode**: If a directory is provided, A11ySentry automatically discovers project roots (e.g., Next.js, Astro, Android) and resolves full component trees for analysis.
-  - **File Mode**: Audits specific files. Use comma-separated paths to provide multi-file context (Recursive Context Rule).
-  **Note**: The output is in **TOON (Token-Oriented Object Notation)** for efficiency.
-  **Format**: ` + "`" + `violations[count]{code,sev,file,line,snippet,msg,fix}:` + "`" + `
-  - ` + "`" + `code` + "`" + `: WCAG Error Code.
-  - ` + "`" + `sev` + "`" + `: Severity (E = Error, W = Warning).
-  - ` + "`" + `snippet` + "`" + `: Truncated HTML/Code fragment.
-  - ` + "`" + `msg` + "`" + `: Description of the issue.
-  - ` + "`" + `fix` + "`" + `: Suggested fix.
-
-- ` + "`" + `get_component_context(path: string)` + "`" + `: Returns the architectural hierarchy (parents and children) of a component to provide better context for analysis.
-
-- ` + "`" + `get_audit_history(limit: number)` + "`" + `: Retrieves the last N accessibility reports from the local database.
-
-## 📋 Examples
-
-### Auditing a Full Project
-If the user asks to check the entire project:
-1. Identify the project root directory.
-2. Run: ` + "`" + `analyze_accessibility(".")` + "`" + ` or ` + "`" + `analyze_accessibility("src/")` + "`" + `.
-
-### Checking History
-If the user wants to see what has been audited recently:
-1. Run: ` + "`" + `get_audit_history(5)` + "`" + `.
-
-### Fixing a contrast issue
-1. Tool reports ` + "`" + `WCAG_1_4_3` + "`" + ` (Contrast) in ` + "`" + `Button.tsx` + "`" + `.
-2. Look for CSS variables or Tailwind classes defining the color.
-3. Apply fix and re-run analysis.
-`
-
-// RegisterAll registers A11ySentry in all supported AI agents.
+// RegisterAll registers A11ySentry in every supported AI agent.
 func RegisterAll(binaryPath string) []error {
-	var errors []error
+	var errs []error
 
 	// List of registration functions
 	regFuncs := []func(string) error{
@@ -107,15 +61,16 @@ func RegisterAll(binaryPath string) []error {
 		RegisterVSCode,
 		RegisterQwen,
 		RegisterOpenCode,
+		RegisterPi,
 	}
 
 	for _, f := range regFuncs {
 		if err := f(binaryPath); err != nil {
-			errors = append(errors, err)
+			errs = append(errs, err)
 		}
 	}
 
-	return errors
+	return errs
 }
 
 func RegisterClaude(binaryPath string) error {
@@ -245,48 +200,197 @@ func RegisterOpenCode(binaryPath string) error {
 	return os.WriteFile(path, newData, 0644)
 }
 
-// RegisterSkill installs the A11ySentry skill in the global Gemini CLI skills directory.
-func RegisterSkill(repoRoot string) error {
-	homeDir, err := os.UserHomeDir()
+// piMCPConfigPath is the location the pi agent runtime reads MCP servers from. It is the same
+// on every platform, but depends on the home directory supplied.
+func piMCPConfigPath(home string) string {
+	return filepath.Join(home, ".pi", "agent", "mcp.json")
+}
+
+// RegisterPi registers A11ySentry in the pi agent runtime. Pi reads the standard
+// {"mcpServers": {...}} shape, so it shares the generic patcher with the other agents.
+func RegisterPi(binaryPath string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	return registerPiAt(home, binaryPath)
+}
+
+// registerPiAt is RegisterPi against an explicit home directory, so the written path is
+// testable without touching the real user profile.
+func registerPiAt(home, binaryPath string) error {
+	return patchConfig(piMCPConfigPath(home), binaryPath)
+}
+
+// AgentRegistration pairs a user-facing label with the function that registers A11ySentry in that
+// agent runtime.
+type AgentRegistration struct {
+	Label    string
+	Register func(binaryPath string) error
+}
+
+// agentProbe is an AgentRegistration plus the paths that show the runtime is installed.
+type agentProbe struct {
+	label   string
+	markers []string
+	reg     func(string) error
+}
+
+// DetectedAgents returns the agent runtimes present on this machine, in menu order.
+//
+// Registration skips a runtime whose configuration directory does not exist, so installing
+// A11ySentry never leaves configuration behind for an agent the user does not have.
+func DetectedAgents() []AgentRegistration {
+	home, _ := os.UserHomeDir()
+
+	probes := agentProbes(home)
+
+	var detected []AgentRegistration
+	for _, p := range probes {
+		for _, marker := range p.markers {
+			if _, err := os.Stat(marker); err == nil {
+				detected = append(detected, AgentRegistration{Label: p.label, Register: p.reg})
+				break
+			}
+		}
+	}
+	return detected
+}
+
+// agentProbes lists every supported runtime with the markers that reveal it. The markers mirror
+// the config locations the Register* functions write to.
+func agentProbes(home string) []agentProbe {
+	if runtime.GOOS == "windows" {
+		appData := os.Getenv("APPDATA")
+		return []agentProbe{
+			{"Claude Desktop", []string{filepath.Join(appData, "Claude")}, RegisterClaude},
+			{"Claude Code (CLI)", []string{filepath.Join(home, ".claude.json")}, RegisterClaudeCode},
+			{"Cursor IDE", []string{filepath.Join(appData, "Cursor")}, RegisterCursor},
+			{"VSCode (Cline/Roo-Code)", []string{filepath.Join(appData, "Code")}, RegisterVSCode},
+			{"Gemini CLI", []string{filepath.Join(appData, "gemini"), filepath.Join(home, ".gemini")}, RegisterGemini},
+			{"Qwen", []string{filepath.Join(home, ".qwen")}, RegisterQwen},
+			{"OpenCode", []string{filepath.Join(home, ".config", "opencode")}, RegisterOpenCode},
+			{"Pi", []string{filepath.Join(home, ".pi", "agent")}, RegisterPi},
+		}
+	}
+
+	return []agentProbe{
+		{"Claude Desktop", []string{filepath.Join(home, "Library", "Application Support", "Claude")}, RegisterClaude},
+		{"Claude Code (CLI)", []string{filepath.Join(home, ".claude.json")}, RegisterClaudeCode},
+		{"Cursor IDE", []string{filepath.Join(home, "Library", "Application Support", "Cursor"), filepath.Join(home, ".config", "Cursor")}, RegisterCursor},
+		{"VSCode (Cline/Roo-Code)", []string{filepath.Join(home, "Library", "Application Support", "Code"), filepath.Join(home, ".config", "Code")}, RegisterVSCode},
+		{"Gemini CLI", []string{filepath.Join(home, ".gemini")}, RegisterGemini},
+		{"Qwen", []string{filepath.Join(home, ".qwen")}, RegisterQwen},
+		{"OpenCode", []string{filepath.Join(home, ".config", "opencode")}, RegisterOpenCode},
+		{"Pi", []string{filepath.Join(home, ".pi", "agent")}, RegisterPi},
+	}
+}
+
+// RegisterDetected registers A11ySentry in every agent runtime present on this machine. It
+// returns the labels it registered in, and one error per runtime that failed, so a single
+// failure does not stop the others.
+func RegisterDetected(binaryPath string) (registered []string, errs []error) {
+	for _, agent := range DetectedAgents() {
+		if err := agent.Register(binaryPath); err != nil {
+			errs = append(errs, fmt.Errorf("%s: %w", agent.Label, err))
+			continue
+		}
+		registered = append(registered, agent.Label)
+	}
+	return registered, errs
+}
+
+// GlobalSkillTargets returns every global skills directory A11ySentry installs into, covering
+// the pi runtime, the cross-runtime agents convention, Gemini CLI, and OpenCode.
+func GlobalSkillTargets(home string) []SkillTarget {
+	return []SkillTarget{
+		{Label: "pi", Path: filepath.Join(home, ".pi", "agent", "skills")},
+		{Label: "Shared agents", Path: filepath.Join(home, ".config", "agents", "skills")},
+		{Label: "Shared agents", Path: filepath.Join(home, ".agents", "skills")},
+		{Label: "Gemini CLI", Path: filepath.Join(home, ".gemini", "skills")},
+		{Label: "OpenCode", Path: filepath.Join(home, ".config", "opencode", "skills")},
+	}
+}
+
+// ProjectSkillTargets returns the project-level skills directories inside repoRoot, following
+// the same discovery convention.
+func ProjectSkillTargets(repoRoot string) []SkillTarget {
+	return []SkillTarget{
+		{Label: "pi", Path: filepath.Join(repoRoot, ".pi", "skills")},
+		{Label: "Shared agents", Path: filepath.Join(repoRoot, ".agent", "skills")},
+		{Label: "Shared agents", Path: filepath.Join(repoRoot, ".agents", "skills")},
+	}
+}
+
+// SkillWriteError reports a failure installing the skill into one directory while letting the
+// remaining directories still be attempted.
+type SkillWriteError struct {
+	Label string
+	Path  string
+	Err   error
+}
+
+func (e *SkillWriteError) Error() string {
+	return fmt.Sprintf("%s (%s): %v", e.Label, e.Path, e.Err)
+}
+
+func (e *SkillWriteError) Unwrap() error { return e.Err }
+
+// writeSkill copies the embedded skill tree into dir under the a11ysentry-mcp subdirectory.
+func writeSkill(dir string) error {
+	dest := filepath.Join(dir, "a11ysentry-mcp")
+	if err := os.MkdirAll(dest, 0755); err != nil {
+		return err
+	}
+
+	return fs.WalkDir(skillFS, skillRoot, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(skillRoot, p)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dest, rel)
+
+		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
+			return err
+		}
+		data, err := skillFS.ReadFile(p)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(target, data, 0644)
+	})
+}
+
+// RegisterSkills installs the agent skill into every global agent skills directory, and, when
+// repoRoot is non-empty, into that project's skill directories as well.
+//
+// Pass an empty repoRoot to install only the global directories, which is what a standalone
+// installer run wants.
+func RegisterSkills(repoRoot string) error {
+	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
 
-	targetDir := filepath.Join(homeDir, ".gemini", "skills", "a11ysentry-mcp")
-	sourceDir := filepath.Join(repoRoot, "skills", "a11ysentry-mcp")
-
-	_ = os.MkdirAll(targetDir, 0755)
-
-	// Check if source exists (local dev mode)
-	if _, err := os.Stat(sourceDir); err == nil {
-		// Simple recursive copy for the skill files (SKILL.md, etc.)
-		return filepath.Walk(sourceDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-
-			rel, err := filepath.Rel(sourceDir, path)
-			if err != nil {
-				return err
-			}
-
-			dest := filepath.Join(targetDir, rel)
-			if info.IsDir() {
-				return os.MkdirAll(dest, info.Mode())
-			}
-
-			data, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-
-			return os.WriteFile(dest, data, info.Mode())
-		})
+	targets := GlobalSkillTargets(home)
+	if repoRoot != "" {
+		targets = append(targets, ProjectSkillTargets(repoRoot)...)
 	}
 
-	// Fallback: Use bundled content (Homebrew / single-binary mode)
-	skillPath := filepath.Join(targetDir, "SKILL.md")
-	return os.WriteFile(skillPath, []byte(a11ysentrySkillContent), 0644)
+	var errs []error
+	for _, t := range targets {
+		if err := writeSkill(t.Path); err != nil {
+			errs = append(errs, &SkillWriteError{Label: t.Label, Path: t.Path, Err: err})
+		}
+	}
+	return errors.Join(errs...)
 }
 
 func patchConfig(configPath, binaryPath string) error {

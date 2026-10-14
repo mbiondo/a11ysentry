@@ -103,23 +103,12 @@ if ($UserPath -notlike "*$InstallDir*") {
 Write-Host "Detecting AI Agents and registering MCP..." -ForegroundColor Cyan
 $BinaryFull = Join-Path $InstallDir $BinaryName
 if (Test-Path $BinaryFull) {
-    # Call the binary with the mcp subcommand
-    & $BinaryFull mcp --register
-    
-    # 7. Skill Registration
-    $SkillSource = $null
-    if ($null -ne $PSScriptRoot -and $PSScriptRoot -ne "") {
-        $SkillSource = Join-Path $PSScriptRoot "skills\a11ysentry-mcp"
-    }
-    
-    $AgentSkillsDir = Join-Path $env:USERPROFILE ".gemini\skills\a11ysentry-mcp"
-    if ($null -ne $SkillSource -and (Test-Path $SkillSource)) {
-        if (!(Test-Path $AgentSkillsDir)) {
-            New-Item -ItemType Directory -Path $AgentSkillsDir -Force | Out-Null
-        }
-        Copy-Item -Path "$SkillSource\*" -Destination $AgentSkillsDir -Recurse -Force
-        Write-Host "Registered a11ysentry-mcp skill in Agent Teams." -ForegroundColor Green
-    }
+    # Register the MCP server in every agent already installed on this machine.
+    & $BinaryFull mcp --register-all
+
+    # Install the agent skill into every known runtime. The binary carries the skill embedded,
+    # so this works without a repository checkout.
+    & $BinaryFull mcp --install-skills
 } else {
     Write-Warning "Automatic MCP registration skipped (binary not found at $BinaryFull)."
 }

@@ -97,16 +97,12 @@ fi
 echo -e "\033[0;36m⚙️  Detecting AI Agents and registering MCP...\033[0m"
 BINARY_FULL="$INSTALL_DIR/$BINARY_NAME"
 if [ -f "$BINARY_FULL" ]; then
-    "$BINARY_FULL" mcp --register
+    # Register the MCP server in every agent already installed on this machine.
+    "$BINARY_FULL" mcp --register-all
 
-    # 6. Skill Registration (Agent Teams Lite)
-    SKILL_SOURCE="$HOME/repositories/semantix/skills/a11ysentry-mcp"
-    AGENT_SKILLS_DIR="$HOME/.gemini/skills/a11ysentry-mcp"
-    if [ -d "$SKILL_SOURCE" ]; then
-        mkdir -p "$AGENT_SKILLS_DIR"
-        cp -r "$SKILL_SOURCE/"* "$AGENT_SKILLS_DIR/"
-        echo -e "\033[0;32m🧠 Registered a11ysentry-mcp skill in Agent Teams.\033[0m"
-    fi
+    # Install the agent skill into every known runtime. The binary carries the skill embedded,
+    # so this works without a repository checkout.
+    "$BINARY_FULL" mcp --install-skills
 else
     echo -e "\033[0;33m⚠️  Automatic MCP registration skipped (binary not found).\033[0m"
 fi

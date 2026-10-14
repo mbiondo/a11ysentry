@@ -26,7 +26,9 @@ We strictly follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### 3. Pull Request Process
 1. Create a new branch.
-2. Ensure all tests pass: `go test ./...`.
+2. Ensure all tests pass. This repo has no root module, so run tests per module (see the
+   [Developer Guide](docs/DEVELOPER_GUIDE.md#build--run)): `go -C engine test ./...`,
+   `go -C mcp test ./...`, and so on. A bare `go test ./...` from the root fails.
 3. Add tests for your changes.
 4. Open a PR with a clear description of the "What" and "Why".
 5. Wait for the A11ySentry CI and maintainer review.
