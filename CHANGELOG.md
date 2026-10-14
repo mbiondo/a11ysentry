@@ -5,7 +5,7 @@ All notable changes to A11ySentry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-14
 
 ### Added
 - **Pi Agent Support**: `a11ysentry mcp --register` now registers the MCP server in the `pi` agent runtime (`~/.pi/agent/mcp.json`), and a new non-interactive `a11ysentry mcp --install-skills` installs the agent skill into every known runtime's skills directory.
