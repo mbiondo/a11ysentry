@@ -100,7 +100,7 @@ func main() {
 	}
 
 	tuiFlag := flag.Bool("tui", false, "Start the interactive TUI dashboard")
-	formatFlag := flag.String("format", "text", "Output format: text, json, json-ld, sarif")
+	formatFlag := flag.String("format", "text", "Output format: text, json, sarif")
 	platformFlag := flag.String("platform", "", "Force platform: react, vue, svelte, angular, astro, android, ios, flutter, dotnet, reactnative, blazor, unity, godot, electron, tauri")
 	dirFlag := flag.String("dir", "", "Analyze a full project directory, resolving component trees automatically")
 	excludeFlag := flag.String("exclude", "", "Comma-separated list of directories to exclude from analysis")
@@ -545,8 +545,11 @@ func printReports(reports []domain.ViolationReport, format, projectRoot, outputF
 	case "sarif":
 		s := sarif.FromReports(reports)
 		out, err = json.MarshalIndent(s, "", "  ")
-	default:
+	case "text":
 		// Text mode handles its own output logic below
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown format %q. Supported formats: text, json, sarif.\n", format)
+		return
 	}
 
 	if err != nil {
