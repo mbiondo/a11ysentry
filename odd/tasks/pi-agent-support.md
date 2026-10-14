@@ -39,7 +39,7 @@ Branch: `feat/pi-agent-support` · Delivery strategy: `single-pr` · Test runner
 | T4 | S1, S2 | inline | done | `RegisterPi`, `GlobalSkillTargets`, `ProjectSkillTargets`, `--install-skills` |
 | T5 | S5 | inline | done | `install.ps1`, `install.sh` delegate to the binary |
 | T6 | S6 | inline | done | standards restored in `docs/standards.md`; build docs corrected |
-| T7 | S1-S6 | delegated | pending | independent verifier over the whole feature |
+| T7 | S1-S6 | delegated | done | independent verifier: S1-S6 all pass, no blockers |
 
 ## Log
 
@@ -79,3 +79,19 @@ Branch: `feat/pi-agent-support` · Delivery strategy: `single-pr` · Test runner
 - **L11** (own findings, 2026-10-14): `docs/DEVELOPER_GUIDE.md` told contributors to run
   `go test ./...` from the root, which fails; corrected to per-module invocations.
 - **Next step**: independent verification of the whole feature against the branch point `5fd3fe3`.
+- **L12** (independent verification, 2026-10-14): verifier returned **pass on S1-S6, no blockers**.
+  Highlights: a scratch `RegisterPi` run wrote `{"mcpServers":{"a11ysentry":{"command":...,
+  "args":["mcp"]}}}` under `.pi/agent/mcp.json` and preserved a pre-existing server; live JSON-RPC
+  `tools/list` returned exactly the three documented tools and the TOON escaping matched; a true
+  fresh clone build failed as documented, and the documented `go work` setup made every documented
+  command work; only one `SKILL.md` remains in the repository.
+- **L13** (correction batch, 2026-10-14): two advisories were defects introduced by this change and
+  were fixed. (a) `--format json-ld` is advertised in the CLI help but has no `case` in
+  `printReports`, so it printed nothing and exited 0; the format is unimplemented, so it was removed
+  from the skill, the CLI help, and four documentation files, and an unknown `--format` now reports
+  an error instead of silently producing no output. (b) `allowed-tools` had been removed from the
+  skill frontmatter rather than corrected; it now lists the three tools the server actually exposes.
+  Also corrected the stale Cursor config path. Remaining advisories are pre-existing and out of
+  scope: `mcp --register --install-skills` gives `--install-skills` precedence, and the tests for
+  `engine/persistence/sqlite` rewrite a tracked `test_history.db`.
+- **Status**: all tasks complete. Delivery (push, PR, merge) is the user's decision.
