@@ -174,5 +174,9 @@ the rules fully ancestor-aware via a populated USN hierarchy (phase 3) is explic
   que no seria problemas" — the S8 JSON body change (`[]ViolationReport` -> `[]UniqueViolation`) is
   accepted as-is, closing advisory A1 from L22. The CHANGELOG keeps its breaking-change note because
   it stays technically accurate for anyone else who starts consuming the output.
-- **Status**: implementation, correction and measurement complete; 14 commits on the branch; S8
+- **L25** (user decision, 2026-10-14, verbatim): "la dejamos" — the asymmetry that the MCP
+  `analyzeFiles` handler does not apply `exclude` (unlike `analyzeDirectory`, `server.go:164`) stays
+  as-is. Passing an explicit file path is a direct order, so filtering it by `exclude` would be
+  surprising. Recorded rather than changed.
+- **Status**: implementation, correction and measurement complete; 15 commits on the branch; S8
   verified with no blockers.
