@@ -80,11 +80,15 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 		lowerFileSet[strings.ToLower(f)] = f
 	}
 
+	seen := make(map[string]bool)
 	add := func(p string) {
 		p = filepath.Clean(p)
-		if realPath, ok := lowerFileSet[strings.ToLower(p)]; ok {
-			resolved = append(resolved, realPath)
+		realPath, ok := lowerFileSet[strings.ToLower(p)]
+		if !ok || seen[realPath] {
+			return
 		}
+		seen[realPath] = true
+		resolved = append(resolved, realPath)
 	}
 
 	// Default: Generic resolution (Regex-based)
@@ -125,8 +129,10 @@ func ResolveImports(filePath string, projectRoot string, fileSet map[string]bool
 			for uiExt := range UIExtensions {
 				add(abs + uiExt)
 			}
-			// Also try with .ts/.js for utility resolution
-			for _, ext := range []string{".ts", ".js", ".tsx", ".jsx"} {
+			// Also try the plain script extensions, which are not in UIExtensions. Listing .tsx
+			// and .jsx here as well resolved every component import twice and duplicated the
+			// whole graph edge, so a shared component appeared twice in one page tree.
+			for _, ext := range []string{".ts", ".js"} {
 				add(abs + ext)
 			}
 		}
