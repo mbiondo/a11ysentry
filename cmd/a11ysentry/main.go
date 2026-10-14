@@ -756,9 +756,18 @@ func shortPath(path, root string) string {
 func handleMCPSubcommand(args []string) {
 	mcpFlags := flag.NewFlagSet("mcp", flag.ExitOnError)
 	registerFlag := mcpFlags.Bool("register", false, "Register A11ySentry in AI Agents (Claude, Cursor, etc.)")
+	installSkillsFlag := mcpFlags.Bool("install-skills", false, "Install the A11ySentry agent skill into every known agent runtime (non-interactive)")
 	binaryPath := mcpFlags.String("path", "", "Path to the a11ysentry binary (defaults to current executable)")
 	if err := mcpFlags.Parse(args); err != nil {
 		log.Fatal(err)
+	}
+
+	if *installSkillsFlag {
+		if err := registration.RegisterSkills(""); err != nil {
+			log.Fatalf("Error installing agent skills: %v", err)
+		}
+		fmt.Println("Installed the a11ysentry-mcp skill for all known agent runtimes.")
+		return
 	}
 
 	if *registerFlag {
@@ -775,9 +784,10 @@ func handleMCPSubcommand(args []string) {
 				{Label: "Cursor IDE"},
 				{Label: "VSCode (Cline/Roo-Code)"},
 				{Label: "Gemini CLI MCP"},
-				{Label: "Gemini CLI Skill"},
 				{Label: "Qwen"},
 				{Label: "OpenCode"},
+				{Label: "Pi"},
+				{Label: "Agent Skills"},
 			},
 		})
 		m, err := p.Run()
@@ -791,7 +801,7 @@ func handleMCPSubcommand(args []string) {
 				return
 			}
 
-			// Try to detect repo root for skill installation
+			// Detect the project root so project-level skills can be installed there.
 			wd, _ := os.Getwd()
 
 			fmt.Printf("\nRegistering A11ySentry MCP from %s...\n", *binaryPath)
@@ -812,12 +822,14 @@ func handleMCPSubcommand(args []string) {
 					err = registration.RegisterVSCode(*binaryPath)
 				case "Gemini CLI MCP":
 					err = registration.RegisterGemini(*binaryPath)
-				case "Gemini CLI Skill":
-					err = registration.RegisterSkill(wd)
 				case "Qwen":
 					err = registration.RegisterQwen(*binaryPath)
 				case "OpenCode":
 					err = registration.RegisterOpenCode(*binaryPath)
+				case "Pi":
+					err = registration.RegisterPi(*binaryPath)
+				case "Agent Skills":
+					err = registration.RegisterSkills(wd)
 				}
 
 				if err != nil {
@@ -1201,5 +1213,7 @@ func printUsage() {
 	fmt.Println("  a11ysentry --tui                  Open the TUI dashboard")
 	fmt.Println("  a11ysentry --platform vue         Force platform (react, vue, svelte, angular, astro, android, ios, ...)")
 	fmt.Println("  a11ysentry mcp                   Start MCP server")
+	fmt.Println("  a11ysentry mcp --register        Register the MCP server in detected AI agents")
+	fmt.Println("  a11ysentry mcp --install-skills  Install the agent skill into every known runtime")
 	fmt.Println("  a11ysentry --version, -v          Show version")
 }
