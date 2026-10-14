@@ -545,7 +545,7 @@ func (a *htmlAdapter) mapAttributes(n *html.Node, usn *domain.USN) {
 		}
 		
 		switch k {
-		case "id", "lang", "type", "class", "className", "for", "aria-pressed", "aria-expanded", "aria-checked", "role", "tabindex", "aria-live", "href", "title", "autocomplete", "aria-hidden", "onclick", "onkeydown", "onkeyup", "onkeypress":
+		case "id", "lang", "type", "class", "className", "for", "aria-pressed", "aria-expanded", "aria-checked", "role", "tabindex", "aria-live", "aria-labelledby", "href", "title", "autocomplete", "aria-hidden", "onclick", "onkeydown", "onkeyup", "onkeypress":
 			usn.Traits[k] = v
 		case "htmlfor":
 			if v != "" {
@@ -688,10 +688,21 @@ func (a *htmlAdapter) demoteNonLandmarks(n *html.Node, usn *domain.USN) {
 			usn.Role = domain.RoleGeneric
 		}
 	case "section", "form":
-		if usn.Label == "" {
+		if !a.hasAccessibleName(n, usn) {
 			usn.Role = domain.RoleGeneric
 		}
 	}
+}
+
+// hasAccessibleName reports whether the element carries a name a landmark can use.
+//
+// getLabel resolves only aria-label and alt, so an element named through aria-labelledby or title
+// must still count here; demoting it would lose a landmark the baseline recognized.
+func (a *htmlAdapter) hasAccessibleName(n *html.Node, usn *domain.USN) bool {
+	if usn.Label != "" {
+		return true
+	}
+	return a.getAttribute(n, "aria-labelledby") != "" || a.getAttribute(n, "title") != ""
 }
 
 // isInsideSectioningContent reports whether the node has an ancestor establishing sectioning

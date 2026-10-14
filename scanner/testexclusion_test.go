@@ -51,3 +51,37 @@ func TestIsTestFile(t *testing.T) {
 		})
 	}
 }
+
+// FilterExcluded must drop files inside an excluded directory at any depth, and keep everything
+// else. Project discovery stops at a project root, so this is what actually applies the
+// a11ysentry.json exclude list inside a single-project directory.
+func TestFilterExcluded(t *testing.T) {
+	files := []string{
+		"/app/src/Button.tsx",
+		"/app/examples/Demo.tsx",
+		"/app/landing/Page.tsx",
+		"/app/src/nested/examples/Inner.tsx",
+		"/app/node_modules/pkg/index.tsx",
+	}
+
+	got := FilterExcluded(files, []string{"examples", "landing", "node_modules"})
+
+	want := []string{"/app/src/Button.tsx"}
+	if len(got) != len(want) {
+		t.Fatalf("FilterExcluded() = %v, want %v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("FilterExcluded()[%d] = %q, want %q", i, got[i], want[i])
+		}
+	}
+}
+
+func TestFilterExcludedIsNoOpWithoutExcludes(t *testing.T) {
+	files := []string{"/app/src/Button.tsx", "/app/examples/Demo.tsx"}
+
+	got := FilterExcluded(files, nil)
+	if len(got) != len(files) {
+		t.Errorf("FilterExcluded() with no excludes dropped files: %v", got)
+	}
+}

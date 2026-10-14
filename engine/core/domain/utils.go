@@ -65,3 +65,37 @@ func isLandmark(role SemanticRole) bool {
 	}
 	return false
 }
+
+// nodeHasAccessibleName reports whether a node carries a name an assistive technology can use.
+//
+// Label holds aria-label/alt/text-derived names. A node named through aria-labelledby or title is
+// equally named, so rules that only look at Label would wrongly treat it as unnamed and demand a
+// label it already has.
+func nodeHasAccessibleName(node USN) bool {
+	if node.Label != "" {
+		return true
+	}
+	if v, ok := node.Traits["aria-labelledby"].(string); ok && v != "" {
+		return true
+	}
+	if v, ok := node.Traits["title"].(string); ok && v != "" {
+		return true
+	}
+	return false
+}
+
+// headingLevel returns the heading level (1-6) of a node, or 0 when it is not a heading.
+//
+// The level comes from the element's tag name rather than from UID: UID holds the id attribute
+// when the element has one, so <h1 id="main-title"> would otherwise parse as level 0 and the page
+// would look like it had no H1 and no heading hierarchy.
+func headingLevel(node USN) int {
+	tag, ok := node.Traits["tag"].(string)
+	if !ok || tag == "" {
+		tag = string(node.UID)
+	}
+
+	level := 0
+	_, _ = fmt.Sscanf(tag, "h%d", &level)
+	return level
+}

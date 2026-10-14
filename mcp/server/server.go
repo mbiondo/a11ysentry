@@ -154,16 +154,17 @@ func (srv *MCPServer) analyzeDirectory(ctx context.Context, dir string) (*mcp.Ca
 			generic.New(),
 		)
 
+		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
+
 		uiFiles, cssFiles, err := fw.CollectFiles(root)
 		if err != nil {
 			log.Printf("Error scanning project root %s: %v", root, err)
 			continue
 		}
+		uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude)
 
 		importGraph := scanner.BuildImportGraph(uiFiles, fw, root)
 		trees := fw.BuildPageTrees(uiFiles, importGraph, root)
-
-		cfg, _ := domain.LoadConfig(filepath.Join(root, "a11ysentry.json"))
 
 		for _, tree := range trees {
 			adapter, platform := getAdapterAndPlatform(tree.Root.FilePath, fw.Name())

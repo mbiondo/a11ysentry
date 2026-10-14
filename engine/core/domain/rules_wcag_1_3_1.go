@@ -19,8 +19,7 @@ func (r *ruleWCAG131) Execute(ctx context.Context, analysisCtx *AnalysisContext)
 	for i, node := range analysisCtx.Nodes {
 		// Heading hierarchy
 		if node.Role == RoleHeading {
-			level := 0
-			_, _ = fmt.Sscanf(string(node.UID), "h%d", &level)
+			level := headingLevel(node)
 			if level > lastHeadingLevel+1 && lastHeadingLevel != 0 {
 				violations = append(violations, Violation{
 					ErrorCode:        r.ErrorCode(),

@@ -295,6 +295,7 @@ func analyzeProject(absDir string, cfg domain.ProjectConfig, repo ports.Reposito
 		fmt.Fprintf(os.Stderr, "Error scanning directory: %v\n", err)
 		return
 	}
+	uiFiles = scanner.FilterExcluded(uiFiles, cfg.Exclude)
 	if len(uiFiles) == 0 {
 		if cfg.Format == "text" {
 			fmt.Printf("  No supported UI files found — skipping.\n\n")
@@ -1062,10 +1063,12 @@ func runLinterMode(cfg domain.ProjectConfig, repo ports.Repository) {
 
 	fmt.Fprintf(os.Stderr, "  Framework detected: %s\n", fw.Name())
 
+	linterCfg, _ := domain.LoadConfig(filepath.Join(absRoot, "a11ysentry.json"))
 	uiFiles, cssFiles, err := fw.CollectFiles(absRoot)
 	if err != nil {
 		log.Fatalf("Linter init error: %v", err)
 	}
+	uiFiles = scanner.FilterExcluded(uiFiles, linterCfg.Exclude)
 
 	importGraph := scanner.BuildImportGraph(uiFiles, fw, absRoot)
 	trees := fw.BuildPageTrees(uiFiles, importGraph, absRoot)

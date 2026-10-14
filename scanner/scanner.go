@@ -74,6 +74,45 @@ var testDirs = map[string]bool{
 	"__snapshots__": true,
 }
 
+// FilterExcluded drops files that live inside an excluded directory.
+//
+// Exclude entries are matched against every path segment, so "examples" removes any file under an
+// examples directory at any depth. Project discovery applies excludes while walking, but that walk
+// stops as soon as it finds a project root, so files inside an already-discovered root were never
+// filtered — which is why the configured exclude had no effect on a single-project directory.
+func FilterExcluded(files []string, excludes []string) []string {
+	if len(files) == 0 || len(excludes) == 0 {
+		return files
+	}
+
+	excluded := make(map[string]bool, len(excludes))
+	for _, e := range excludes {
+		if e = strings.TrimSpace(e); e != "" {
+			excluded[strings.ToLower(filepath.ToSlash(e))] = true
+		}
+	}
+	if len(excluded) == 0 {
+		return files
+	}
+
+	kept := make([]string, 0, len(files))
+	for _, f := range files {
+		if !hasExcludedSegment(strings.ToLower(filepath.ToSlash(f)), excluded) {
+			kept = append(kept, f)
+		}
+	}
+	return kept
+}
+
+func hasExcludedSegment(slashPath string, excluded map[string]bool) bool {
+	for _, segment := range strings.Split(slashPath, "/") {
+		if excluded[segment] {
+			return true
+		}
+	}
+	return false
+}
+
 // IsTestFile reports whether path is a test, spec, mock, or snapshot file. Test files are
 // excluded from collection by default so they never become analysis roots.
 func IsTestFile(path string) bool {

@@ -238,3 +238,77 @@ func TestScannerRecognizesTestFiles(t *testing.T) {
 		t.Fatal("unexpected temp file name")
 	}
 }
+
+// S4 regression: an element named through aria-labelledby is still a landmark. getLabel resolves
+// only aria-label and alt, so the demotion must not treat such an element as unnamed.
+func TestSectionNamedByAriaLabelledbyIsStillARegion(t *testing.T) {
+	file := writeTemp(t, "page.html",
+		`<!DOCTYPE html><html lang="en"><body><section id="s" aria-labelledby="h"><h2 id="h">X</h2></section></body></html>`)
+
+	nodes := ingestNodes(t, &domain.FileNode{FilePath: file})
+
+	section := findNode(nodes, "s")
+	if section == nil {
+		t.Fatal("section node not found")
+	}
+	if section.Role != domain.RoleSection {
+		t.Errorf("section named via aria-labelledby role = %q, want region", section.Role)
+	}
+}
+
+func TestFormNamedByTitleIsStillALandmark(t *testing.T) {
+	file := writeTemp(t, "page.html",
+		`<!DOCTYPE html><html lang="en"><body><h1>t</h1><form id="f" title="Checkout"><input id="i"></form></body></html>`)
+
+	nodes := ingestNodes(t, &domain.FileNode{FilePath: file})
+
+	form := findNode(nodes, "f")
+	if form == nil {
+		t.Fatal("form node not found")
+	}
+	if form.Role != domain.RoleForm {
+		t.Errorf("form named via title role = %q, want form", form.Role)
+	}
+}
+
+// S6 negative: the de-duplication must not hide a genuine duplicate id declared by two DIFFERENT
+// files in the same page tree.
+func TestGenuineDuplicateIDAcrossFilesIsStillReported(t *testing.T) {
+	a := writeTemp(t, "A.html", `<div id="dup">A</div>`)
+	b := writeTemp(t, "B.html", `<div id="dup">B</div>`)
+
+	root := &domain.FileNode{FilePath: a, Children: []*domain.FileNode{{FilePath: b}}}
+
+	nodes := ingestNodes(t, root)
+
+	violations, err := domain.NewAnalyzer().Analyze(context.Background(), nodes, domain.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+	for _, v := range violations {
+		if v.ErrorCode == "WCAG_4_1_1" {
+			return
+		}
+	}
+	t.Error("a duplicate id declared by two different files was not reported")
+}
+
+// S2 follow-up: the heading-skip rule must also read the tag, otherwise an id-bearing heading
+// parses as level 0 and a real skip goes unreported.
+func TestHeadingSkipIsDetectedWhenHeadingsCarryIDs(t *testing.T) {
+	file := writeTemp(t, "page.html",
+		`<!DOCTYPE html><html lang="en"><body><h1 id="a">A</h1><h3 id="b">B</h3></body></html>`)
+
+	nodes := ingestNodes(t, &domain.FileNode{FilePath: file})
+
+	violations, err := domain.NewAnalyzer().Analyze(context.Background(), nodes, domain.DefaultConfig())
+	if err != nil {
+		t.Fatalf("Analyze failed: %v", err)
+	}
+	for _, v := range violations {
+		if v.ErrorCode == "WCAG_1_3_1" {
+			return
+		}
+	}
+	t.Error("H1 -> H3 skip was not reported when both headings carry an id")
+}

@@ -1,9 +1,5 @@
 package domain
 
-import (
-	"fmt"
-)
-
 // BuildAnalysisContext performs a first pass over the nodes to collect metadata.
 func BuildAnalysisContext(nodes []USN, cfg ProjectConfig) *AnalysisContext {
 	ctx := &AnalysisContext{
@@ -59,16 +55,7 @@ func BuildAnalysisContext(nodes []USN, cfg ProjectConfig) *AnalysisContext {
 		}
 
 		if node.Role == RoleHeading {
-			level := 0
-			// Prefer the element's tag name: UID carries the id attribute when the element has
-			// one, so <h1 id="main-title"> would otherwise parse as level 0 and the page would
-			// be reported as missing an H1 it actually has.
-			if tag, ok := node.Traits["tag"].(string); ok && tag != "" {
-				_, _ = fmt.Sscanf(tag, "h%d", &level)
-			} else {
-				_, _ = fmt.Sscanf(string(node.UID), "h%d", &level)
-			}
-			if level == 1 {
+			if headingLevel(node) == 1 {
 				ctx.HasH1 = true
 			}
 		}
